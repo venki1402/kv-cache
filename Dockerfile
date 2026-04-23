@@ -1,34 +1,39 @@
-FROM golang:1.21-alpine AS builder
+# builder stage
+FROM golang:1.24-alpine AS builder
+
+# Create an unprivileged user for security
+RUN adduser -D -g '' cacheuser
 
 WORKDIR /app
 
-# Copy go mod and sum files
-COPY go.mod ./
-# If you have a go.sum file, uncomment the next line
-# COPY go.sum ./
-
-# Download dependencies
+# Copy dependency files first to leverage Docker layer caching
+COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy source code
-COPY *.go ./
+# Copy the rest of the source code
+COPY . .
 
-# Build the application with optimization flags
-RUN CGO_ENABLED=0 GOOS=linux go build -o kv-cache -ldflags="-s -w" .
+# Build the binary statically with extreme optimizations
+# - CGO_ENABLED=0: Statically links the binary
+# - trimpath: Removes absolute file system paths from the compiled executable
+# - ldflags="-s -w": Strips debugging information and symbol tables to reduce size
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o kv-cache .
 
-# Create a minimal production image
-FROM alpine:latest
+# final production image
+# Use 'scratch', an empty image, for the smallest possible footprint
+FROM scratch
 
-# Add runtime dependencies if needed
-RUN apk --no-cache add ca-certificates
+# Copy the user/group information from the builder stage
+COPY --from=builder /etc/passwd /etc/passwd
 
-WORKDIR /app
+# Copy the statically compiled binary
+COPY --from=builder /app/kv-cache /kv-cache
 
-# Copy the binary from the builder stage
-COPY --from=builder /app/kv-cache .
+# Tell Docker to run the container as the unprivileged user
+USER cacheuser
 
-# Expose the required port
+# Expose the application port
 EXPOSE 7171
 
-# Run the application
-CMD ["./kv-cache"]
+# Use ENTRYPOINT instead of CMD for pure executables
+ENTRYPOINT ["/kv-cache"]

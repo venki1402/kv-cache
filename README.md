@@ -1,6 +1,6 @@
 # ultra fast sharded key value lru cache
 
-![Go Version](https://img.shields.io/badge/Go-1.25.7-blue.svg)
+![Go Version](https://img.shields.io/badge/Go-1.24-blue.svg)
 ![Coverage](https://img.shields.io/badge/Coverage-76.5%25-brightgreen.svg)
 ![Build](https://img.shields.io/badge/Build-Passing-brightgreen.svg)
 
@@ -59,6 +59,22 @@ go mod tidy
 
 ```bash
 go run main.go
+```
+
+**The server will start on localhost:7171**
+
+## run with docker
+
+> build the docker image
+
+```bash
+docker build -t kv-cache .
+```
+
+> run the container
+
+```bash
+docker run -p 7171:7171 sharded-cache
 ```
 
 **The server will start on localhost:7171**
