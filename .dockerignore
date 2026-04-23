@@ -1,0 +1,9 @@
+# git
+.git
+.gitignore
+
+# binary
+main
+
+# docs
+README.md
