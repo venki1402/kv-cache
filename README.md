@@ -1,54 +1,106 @@
-# Sharded In-Memory Cache
+# ultra fast sharded key value lru cache
 
-A high-performance, sharded in-memory cache with LRU eviction and memory monitoring, implemented in Go.
+![Go Version](https://img.shields.io/badge/Go-1.25.7-blue.svg)
+![Coverage](https://img.shields.io/badge/Coverage-76.5%25-brightgreen.svg)
+![Build](https://img.shields.io/badge/Build-Passing-brightgreen.svg)
 
-## Features
+a high throughput, memory-bounded, sharded LRU key-value cache written in Go. Designed to eliminate concurrency bottlenecks and Garbage Collection (GC) pauses under heavy load, achieving over **172,000 requests per second** on consumer hardware.
 
-- **Sharded Design**: Uses multiple shards to improve concurrency.
-- **LRU Eviction**: Removes least recently used entries when memory is full.
-- **Memory Monitoring**: Automatically evicts items when memory usage exceeds 70%.
-- **REST API**: Supports `PUT` and `GET` requests for cache operations.
+## performance benchmarks
 
-## API Endpoints
+benchmarked using `wrk` and a `Lua` randomization script to simulate 400 concurrent connections across 8 threads for 30 seconds.
 
-### Store a key-value pair
+* **Throughput**: 172, 760 Requests / Second
+* **Average Latency**: 3.25 ms
+* **Total Volume**: 5,198,917 requests served in 30 seconds
+* **Data Transferred**: 1.00 GB
 
-```
-PUT /put
-Content-Type: application/json
-{
-  "key": "example",
-  "value": "data"
-}
-```
-
-### Retrieve a value by key
-
-```
-GET /get?key=example
+```text
+Running 30s test @ http://localhost:7171
+  8 threads and 400 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency     3.25ms    8.15ms 153.97ms   92.83%
+    Req/Sec    21.79k     7.82k   62.17k    72.32%
+  5198917 requests in 30.09s, 0.99GB read
+Requests/sec: 172760.78
+Transfer/sec:     33.58MB
 ```
 
-## Running with Docker
+## architecture highlights
 
-### Build the Docker image
+* Zero Lock Contention: Utilizes a 32-way sharded architecture. Requests are routed to specific shards using a highly optimized djb2 bitwise hashing algorithm, ensuring that parallel requests rarely fight for the same sync.Mutex.
 
+* Deterministic O(1) Eviction: Implements a strict doubly-linked list (LRU) combined with a map pointer system. When a shard hits its math-allocated memory threshold, it evicts stale data in true O(1) time.
+
+* Strict Memory Bounding: Tracks exact byte allocations per shard instead of relying on standard runtime.MemStats. This keeps the cache footprint strictly under the 1GB threshold without triggering "stop-the-world" Go GC pauses.
+
+* High-Speed HTTP: Powered by fasthttp, the fastest HTTP package available for Go, bypassing the standard library's overhead for extreme raw throughput.
+
+## local development
+
+> prerequisites
+
+Go 1.21 or higher
+
+> clone the repository
+
+```bash
+git clone https://github.com/venki1402/kv-cache
+cd kv-cache
 ```
-docker build -t sharded-cache .
+
+> install dependencies
+
+```bash
+go mod tidy
 ```
 
-### Run the container
+> run the server
 
-```
-docker run -p 7171:7171 sharded-cache
-```
-
-## Running Locally
-
-```
+```bash
 go run main.go
 ```
 
-## Requirements
+**The server will start on localhost:7171**
 
-- Go 1.18+
-- Docker (optional)
+## api usage
+
+### 1. Insert / Update a Key (PUT)
+
+```Bash
+curl -X POST <http://localhost:7171/put> \\
+  -H "Content-Type: application/json" \\
+  -d '{"key":"king", "value":"venki"}'
+```
+
+Response:
+
+```JSON
+{"status":"OK","message":"Key inserted/updated"}
+```
+
+### 2. Retrieve a Key (GET)
+
+```Bash
+curl -X GET "<http://localhost:7171/get?key=king>"
+```
+
+Response:
+
+```JSON
+{"status":"OK","key":"king","value":"venki"}
+```
+
+## testing
+
+The project maintains 76.5% test coverage, specifically targeting core sharding logic, hash collisions, O(1) memory eviction constraints, and HTTP edge cases.
+
+> To run the test suite:
+
+```Bash
+go test -v -cover
+```
+
+## License
+
+This project is licensed under the MIT License.
