@@ -8,6 +8,8 @@ a high throughput, memory-bounded, sharded LRU key-value cache written in Go. De
 
 ## performance benchmarks
 
+try it yourself - https://gist.github.com/Venki1402/4c9c0e99106ede89a558c04768a56e3d
+
 benchmarked using `wrk` and a `Lua` randomization script to simulate 400 concurrent connections across 8 threads for 30 seconds.
 
 * **Throughput**: 172, 760 Requests / Second
