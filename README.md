@@ -76,7 +76,7 @@ docker build -t kv-cache .
 > run the container
 
 ```bash
-docker run -p 7171:7171 sharded-cache
+docker run -p 7171:7171 kv-cache
 ```
 
 **The server will start on localhost:7171**
