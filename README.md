@@ -10,6 +10,51 @@ a high throughput, memory-bounded, sharded LRU key-value cache written in Go. us
 
 try it yourself - https://gist.github.com/Venki1402/4c9c0e99106ede89a558c04768a56e3d
 
+## instructions to benchmark venki1402/kv-cache yourself
+
+### run it
+```bash
+docker run -p 7171:7171 venki1402/kv-cache
+```
+
+#### seed the cache with 1,000 keys
+
+```bash
+for i in {1..1000}; do
+  curl -X POST http://localhost:7171/put -H "Content-Type: application/json" -d "{\\"key\\":\\"key$i\\", \\"value\\":\\"This is the cached value for item $i\\"}"
+done
+```
+
+#### create the `random_keys.lua` script
+
+```lua
+math.randomseed(os.time())
+request = function()
+   local random_id = math.random(1, 1000)
+   local path = "/get?key=key" .. random_id
+   return wrk.format("GET", path)
+end
+```
+
+#### run `wrk`
+
+```bash
+wrk -t8 -c400 -d30s -s random_keys.lua http://localhost:7171
+```
+
+#### results
+
+```
+Running 30s test @ http://localhost:7171
+  8 threads and 400 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency     3.25ms    8.15ms 153.97ms   92.83%
+    Req/Sec    21.79k     7.82k   62.17k    72.32%
+  5198917 requests in 30.09s, 0.99GB read
+Requests/sec: 172760.78
+Transfer/sec:     33.58MB
+```
+
 benchmarked using `wrk` and a `Lua` randomization script to simulate 400 concurrent connections across 8 threads for 30 seconds.
 
 * **Throughput**: 172, 760 Requests / Second
