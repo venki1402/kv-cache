@@ -4,7 +4,7 @@
 ![Coverage](https://img.shields.io/badge/Coverage-76.5%25-brightgreen.svg)
 ![Build](https://img.shields.io/badge/Build-Passing-brightgreen.svg)
 
-a high throughput, memory-bounded, sharded LRU key-value cache written in Go. Designed to eliminate concurrency bottlenecks and Garbage Collection (GC) pauses under heavy load, achieving over **172,000 requests per second** on consumer hardware.
+a high throughput, memory-bounded, sharded LRU key-value cache written in Go. uses bitwise request routing across 32 shards to minimize lock contention and deterministic O(1) eviction to maintain a strict memory limit, sustaining **172K+ requests/sec** at **~3.2 ms median** latency..
 
 ## performance benchmarks
 
