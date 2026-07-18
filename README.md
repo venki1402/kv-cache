@@ -1,10 +1,10 @@
 # ultra fast sharded key value lru cache
 
 ![Go Version](https://img.shields.io/badge/Go-1.24-blue.svg)
-![Coverage](https://img.shields.io/badge/Coverage-76.5%25-brightgreen.svg)
+![Coverage](https://img.shields.io/badge/Coverage-77.5%25-brightgreen.svg)
 ![Build](https://img.shields.io/badge/Build-Passing-brightgreen.svg)
 
-a high throughput, memory-bounded, sharded LRU key-value cache written in Go. uses bitwise request routing across 32 shards to minimize lock contention and deterministic O(1) eviction to maintain a strict memory limit, sustaining **172K+ requests/sec** at **~3.2 ms median** latency..
+a high throughput, memory-bounded, sharded LRU key-value cache written in Go. uses bitwise request routing across 32 shards to minimize lock contention and deterministic O(1) eviction to maintain a strict memory limit, sustaining **172K+ requests/sec** at **~2.15 ms median (p50)** latency.
 
 ## performance benchmarks
 
@@ -39,7 +39,7 @@ end
 #### run `wrk`
 
 ```bash
-wrk -t8 -c400 -d30s -s random_keys.lua http://localhost:7171
+wrk -t8 -c400 -d30s --latency -s random_keys.lua http://localhost:7171
 ```
 
 #### results
@@ -48,38 +48,33 @@ wrk -t8 -c400 -d30s -s random_keys.lua http://localhost:7171
 Running 30s test @ http://localhost:7171
   8 threads and 400 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency     3.25ms    8.15ms 153.97ms   92.83%
-    Req/Sec    21.79k     7.82k   62.17k    72.32%
-  5198917 requests in 30.09s, 0.99GB read
-Requests/sec: 172760.78
-Transfer/sec:     33.58MB
+    Latency     2.15ms  817.35us  38.41ms   90.43%
+    Req/Sec    21.77k     1.35k   33.01k    79.08%
+  Latency Distribution
+     50%    2.15ms
+     75%    2.28ms
+     90%    2.49ms
+     99%    4.41ms
+  5205733 requests in 30.10s, 0.99GB read
+Requests/sec: 172965.97
+Transfer/sec:     33.62MB
 ```
 
-benchmarked using `wrk` and a `Lua` randomization script to simulate 400 concurrent connections across 8 threads for 30 seconds.
+benchmarked using `wrk` and a `Lua` randomization script to simulate 400 concurrent connections across 8 threads for 30 seconds. the workload is read-heavy: the script issues only `GET` requests against 1,000 pre-seeded keys (near-100% cache hits).
 
-* **Throughput**: 172, 760 Requests / Second
-* **Average Latency**: 3.25 ms
-* **Total Volume**: 5,198,917 requests served in 30 seconds
-* **Data Transferred**: 1.00 GB
-
-```text
-Running 30s test @ http://localhost:7171
-  8 threads and 400 connections
-  Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency     3.25ms    8.15ms 153.97ms   92.83%
-    Req/Sec    21.79k     7.82k   62.17k    72.32%
-  5198917 requests in 30.09s, 0.99GB read
-Requests/sec: 172760.78
-Transfer/sec:     33.58MB
-```
+* **Throughput**: 172,965 Requests / Second
+* **Median Latency (p50)**: 2.15 ms
+* **p99 Latency**: 4.41 ms
+* **Total Volume**: 5,205,733 requests served in 30 seconds
+* **Data Transferred**: 0.99 GB
 
 ## architecture highlights
 
-* Zero Lock Contention: Utilizes a 32-way sharded architecture. Requests are routed to specific shards using a highly optimized djb2 bitwise hashing algorithm, ensuring that parallel requests rarely fight for the same sync.Mutex.
+* Minimized Lock Contention: Utilizes a 32-way sharded architecture. Requests are routed to specific shards using a djb2 bitwise hashing algorithm, so parallel requests rarely fight for the same sync.Mutex.
 
 * Deterministic O(1) Eviction: Implements a strict doubly-linked list (LRU) combined with a map pointer system. When a shard hits its math-allocated memory threshold, it evicts stale data in true O(1) time.
 
-* Strict Memory Bounding: Tracks exact byte allocations per shard instead of relying on standard runtime.MemStats. This keeps the cache footprint strictly under the 1GB threshold without triggering "stop-the-world" Go GC pauses.
+* Strict Memory Bounding: Tracks exact byte allocations per shard instead of relying on standard runtime.MemStats, keeping the cached data strictly under a configurable 1GB ceiling.
 
 * High-Speed HTTP: Powered by fasthttp, the fastest HTTP package available for Go, bypassing the standard library's overhead for extreme raw throughput.
 
@@ -156,7 +151,7 @@ Response:
 
 ## testing
 
-The project maintains 76.5% test coverage, specifically targeting core sharding logic, hash collisions, O(1) memory eviction constraints, and HTTP edge cases.
+The project maintains 77.5% test coverage, specifically targeting core sharding logic, hash collisions, O(1) memory eviction constraints, and HTTP edge cases.
 
 > To run the test suite:
 
