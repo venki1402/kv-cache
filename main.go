@@ -146,6 +146,20 @@ func (c *ShardedCache) Get(key string) (string, bool) {
 
 var cache *ShardedCache
 
+// Pre-marshaled responses for hot/static paths — avoids per-request
+// allocation and formatting (fmt.Fprintf / json.Marshal) on responses
+// whose bodies never change.
+var (
+	putSuccessBytes   = []byte(`{"status":"OK","message":"Key inserted/updated"}`)
+	invalidJSONBytes  = []byte(`{"status":"ERROR","message":"Invalid JSON"}`)
+	keyRequiredBytes  = []byte(`{"status":"ERROR","message":"Key is required"}`)
+	keyParamReqBytes  = []byte(`{"status":"ERROR","message":"Key parameter is required"}`)
+	sizeExceededBytes = []byte(`{"status":"ERROR","message":"key or value exceeds maximum size"}`)
+	keyNotFoundBytes  = []byte(`{"status":"ERROR","message":"Key not found"}`)
+	notFoundBytes     = []byte(`{"status":"ERROR","message":"Endpoint not found"}`)
+	healthOKBytes     = []byte(`{"status":"healthy"}`)
+)
+
 func requestHandler(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set("Content-Type", "application/json")
 
@@ -155,33 +169,38 @@ func requestHandler(ctx *fasthttp.RequestCtx) {
 			var req PutRequest
 			if err := json.Unmarshal(ctx.PostBody(), &req); err != nil {
 				ctx.SetStatusCode(fasthttp.StatusBadRequest)
-				fmt.Fprintf(ctx, `{"status":"ERROR","message":"Invalid JSON"}`)
+				ctx.SetBody(invalidJSONBytes)
 				return
 			}
 
 			if req.Key == "" {
 				ctx.SetStatusCode(fasthttp.StatusBadRequest)
-				fmt.Fprintf(ctx, `{"status":"ERROR","message":"Key is required"}`)
+				ctx.SetBody(keyRequiredBytes)
 				return
 			}
 
 			if err := cache.Put(req.Key, req.Value); err != nil {
 				ctx.SetStatusCode(fasthttp.StatusBadRequest)
-				fmt.Fprintf(ctx, `{"status":"ERROR","message":"%s"}`, err.Error())
+				ctx.SetBody(sizeExceededBytes)
 				return
 			}
 
 			ctx.SetStatusCode(fasthttp.StatusOK)
-			fmt.Fprintf(ctx, `{"status":"OK","message":"Key inserted/updated"}`)
+			ctx.SetBody(putSuccessBytes)
 			return
 		}
 
 	case "GET":
+		if string(ctx.Path()) == "/health" {
+			ctx.SetStatusCode(fasthttp.StatusOK)
+			ctx.SetBody(healthOKBytes)
+			return
+		}
 		if string(ctx.Path()) == "/get" {
 			key := string(ctx.QueryArgs().Peek("key"))
 			if key == "" {
 				ctx.SetStatusCode(fasthttp.StatusBadRequest)
-				fmt.Fprintf(ctx, `{"status":"ERROR","message":"Key parameter is required"}`)
+				ctx.SetBody(keyParamReqBytes)
 				return
 			}
 
@@ -196,14 +215,14 @@ func requestHandler(ctx *fasthttp.RequestCtx) {
 				ctx.SetBody(respJSON)
 			} else {
 				ctx.SetStatusCode(fasthttp.StatusNotFound)
-				fmt.Fprintf(ctx, `{"status":"ERROR","message":"Key not found"}`)
+				ctx.SetBody(keyNotFoundBytes)
 			}
 			return
 		}
 	}
 
 	ctx.SetStatusCode(fasthttp.StatusNotFound)
-	fmt.Fprintf(ctx, `{"status":"ERROR","message":"Endpoint not found"}`)
+	ctx.SetBody(notFoundBytes)
 }
 
 func main() {

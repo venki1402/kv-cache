@@ -119,6 +119,26 @@ func TestRequestHandler_Get(t *testing.T) {
 	}
 }
 
+func TestRequestHandler_Health(t *testing.T) {
+	ctx := &fasthttp.RequestCtx{}
+	ctx.Request.Header.SetMethod("GET")
+	ctx.Request.SetRequestURI("/health")
+
+	requestHandler(ctx)
+
+	if ctx.Response.StatusCode() != 200 {
+		t.Fatalf("expected 200, got %d", ctx.Response.StatusCode())
+	}
+
+	var resp map[string]string
+	if err := json.Unmarshal(ctx.Response.Body(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if resp["status"] != "healthy" {
+		t.Fatalf("expected healthy status, got %s", resp["status"])
+	}
+}
+
 func TestRequestHandler_PutBadJSON(t *testing.T) {
 	cache = NewShardedCache(4, 1024*1024)
 
