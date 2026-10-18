@@ -259,7 +259,7 @@ Baseline is commit [`8c563c0`](https://github.com/venki1402/kv-cache/tree/8c563c
 3. On approval it commits `chore(release): deploy <short-sha> [skip ci]`, which sets `image.tag` in `values-local.yaml`.
 4. Argo CD syncs the change. `/version` and `kvcache_build_info` report the new commit.
 
-The release commit is a bot commit; the source it deploys is its parent.
+The release commit is a bot commit. It deploys the commit named in its message, the one its CI run built and tested. That is usually its parent, but not always: if other commits land while the release waits for approval, they sit in between (e.g. 4cfd5e1 deploys 240ba9d, while its parent is fa0d8bf).
 
 ## rollback
 

@@ -22,5 +22,5 @@ The Prometheus alerts page does not auto-refresh, so a screenshot can be saved a
 |---|---|---|---|
 | Healthy | [`05a-alert-inactive-before.png`](screenshots/05a-alert-inactive-before.png) | 23:04:40 | All `kv-cache.kubernetes` and `kv-cache.slo` rules loaded and inactive, between runs A and B. Only kube-prometheus-stack's always-on `Watchdog` is firing |
 | Pending | [`05b-alert-pending.png`](screenshots/05b-alert-pending.png) | 23:09:09 | Run B: `KvCachePodNotReady` **pending** for pod `kv-cache-6c6c79bf-848gq`, active 33.75 s into its 2m `for:` window. `KvCacheRolloutStuck` is also pending |
-| Firing | [`05c-alert-firing.png`](screenshots/05c-alert-firing.png) | 23:11:39 | Run B: `KvCachePodNotReady` **firing** (critical) for the same pod, active 2m 12s, so the state is from just before the 23:10:33 revert |
+| Firing | [`05c-alert-firing.png`](screenshots/05c-alert-firing.png) | 23:11:39 | Run B: `KvCachePodNotReady` **firing** (critical) for the same pod, active 2m 12s. Pending started at about 23:08:35, so this is the state at about 23:10:47. Argo CD had synced the 23:10:33 revert at 23:10:41, but the alert stays firing until Prometheus next evaluates the rule (every 30 s) |
 | Recovered | [`05d-alert-resolved.png`](screenshots/05d-alert-resolved.png) | 23:14:43 | After the revert: all six `kv-cache.kubernetes` rules inactive again |

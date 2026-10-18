@@ -28,8 +28,10 @@ Verified against commit `8c563c0`:
 | `.dockerignore` | Yes |
 | Public Docker Hub image (`venki1402/kv-cache`) | Yes |
 | Unit tests (`main_test.go`, ~77.5% coverage) | Yes |
+| `/health` endpoint (plain-text logs only, no metrics or tracing) | Yes |
+| Non-root container user | Yes |
 | CI pipeline | **No.** `git log --all -- .github .gitlab-ci.yml .circleci Jenkinsfile` returns nothing |
-| Kubernetes manifests, CD, observability | No |
+| Kubernetes manifests, CD, metrics, tracing | No |
 
 ## Change summary
 
