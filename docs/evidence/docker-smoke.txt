@@ -1,0 +1,20 @@
+# Local container smoke test (docker run, AUTH_TOKEN set to a throwaway value)
+# 2026-10-18T15:54:56Z
+sha256:733043ee0bb27b95551e621713a8837f3d0647b3105533147f4a921dcc2e9085
+X-App-Version: 0.0.0-local
+{"buildTime":"2026-10-18T15:51:43Z","commit":"9d5f9323933a1f376081fcd5c42fc8a0de544faf","version":"0.0.0-local"}
+
+put no token: 401
+{"status":"OK","message":"Key inserted/updated"} (200)
+{"status":"OK","key":"a","value":"b"} (200)
+{"status":"ready"} (200)
+kvcache_build_info{commit="9d5f9323933a1f376081fcd5c42fc8a0de544faf",version="0.0.0-local"} 1
+kvcache_cache_hits_total 1
+kvcache_keys 1
+{"time":"2026-10-18T15:54:05.591271343Z","level":"INFO","msg":"starting kv-cache server","version":"0.0.0-local","commit":"9d5f9323933a1f376081fcd5c42fc8a0de544faf","port":"7171","metrics_port":"9091","max_memory_bytes":1073741824,"auth_enabled":true,"tracing_enabled":false,"build_time":"2026-10-18T15:51:43Z"}
+65532:65532 {"org.opencontainers.image.licenses":"MIT","org.opencontainers.image.revision":"9d5f9323933a1f376081fcd5c42fc8a0de544faf","org.opencontainers.image.source":"https://github.com/venki1402/kv-cache","org.opencontainers.image.title":"kv-cache","org.opencontainers.image.version":"0.0.0-local"}
+{"time":"2026-10-18T15:54:04.422433092Z","level":"INFO","msg":"starting kv-cache server","version":"0.0.0-local","commit":"9d5f9323933a1f376081fcd5c42fc8a0de544faf","port":"7171","metrics_port":"9091","max_memory_bytes":1073741824,"auth_enabled":true,"tracing_enabled":false,"build_time":"2026-10-18T15:51:43Z"}
+{"time":"2026-10-18T15:54:05.642966635Z","level":"INFO","msg":"shutdown started","version":"0.0.0-local","commit":"9d5f9323933a1f376081fcd5c42fc8a0de544faf","delay":"2s"}
+{"time":"2026-10-18T15:54:07.645935511Z","level":"INFO","msg":"shutdown complete","version":"0.0.0-local","commit":"9d5f9323933a1f376081fcd5c42fc8a0de544faf"}
+
+[exited with code 0]
