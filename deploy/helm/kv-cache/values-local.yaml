@@ -9,4 +9,3 @@ config:
     enabled: true
     endpoint: http://jaeger.observability.svc.cluster.local:4317
     samplerArg: "1.0"
-  failReadiness: true
