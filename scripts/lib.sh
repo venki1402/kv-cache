@@ -18,4 +18,4 @@ attribution_check() {
     echo "attribution check failed" >&2; exit 1
   fi
 }
-push() { attribution_check; git pull --rebase -q; git push -q; }
+push() { attribution_check; git pull --rebase --autostash -q; git push -q; }

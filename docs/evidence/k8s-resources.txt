@@ -1,0 +1,49 @@
+# captured 2026-10-18T16:44:10Z
+$ kubectl -n kv-cache get deploy,rs,pods,svc,ingress,cm,sa,networkpolicy,servicemonitor,prometheusrule -o wide
+NAME                       READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES                                                                SELECTOR
+deployment.apps/kv-cache   1/1     1            1           28m   kv-cache     ghcr.io/venki1402/kv-cache:326a537352014ec8451531b0544d42b1ca949a2c   app.kubernetes.io/instance=kv-cache,app.kubernetes.io/name=kv-cache
+
+NAME                                  DESIRED   CURRENT   READY   AGE     CONTAINERS   IMAGES                                                                SELECTOR
+replicaset.apps/kv-cache-5dbdf86874   1         1         1       13m     kv-cache     ghcr.io/venki1402/kv-cache:326a537352014ec8451531b0544d42b1ca949a2c   app.kubernetes.io/instance=kv-cache,app.kubernetes.io/name=kv-cache,pod-template-hash=5dbdf86874
+replicaset.apps/kv-cache-744f4656c6   0         0         0       9m25s   kv-cache     ghcr.io/venki1402/kv-cache:326a537352014ec8451531b0544d42b1ca949a2c   app.kubernetes.io/instance=kv-cache,app.kubernetes.io/name=kv-cache,pod-template-hash=744f4656c6
+replicaset.apps/kv-cache-7b8b8754f5   0         0         0       28m     kv-cache     ghcr.io/venki1402/kv-cache:9cb6b3121ddbfc51bbda31cf73179b4f4010fa67   app.kubernetes.io/instance=kv-cache,app.kubernetes.io/name=kv-cache,pod-template-hash=7b8b8754f5
+
+NAME                            READY   STATUS    RESTARTS   AGE     IP            NODE                    NOMINATED NODE   READINESS GATES
+pod/kv-cache-5dbdf86874-5wfl5   1/1     Running   0          2m40s   10.244.0.24   kvcache-control-plane   <none>           <none>
+
+NAME               TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)             AGE   SELECTOR
+service/kv-cache   ClusterIP   10.96.194.99   <none>        7171/TCP,9091/TCP   28m   app.kubernetes.io/instance=kv-cache,app.kubernetes.io/name=kv-cache
+
+NAME                                 CLASS     HOSTS          ADDRESS     PORTS   AGE
+ingress.networking.k8s.io/kv-cache   traefik   kv.localhost   127.0.0.1   80      28m
+
+NAME                           DATA   AGE
+configmap/kube-root-ca.crt     1      28m
+configmap/kv-cache             9      28m
+configmap/kv-cache-dashboard   1      28m
+
+NAME                      AGE
+serviceaccount/default    28m
+serviceaccount/kv-cache   28m
+
+NAME                                                   POD-SELECTOR                                                          AGE
+networkpolicy.networking.k8s.io/default-deny-ingress   <none>                                                                28m
+networkpolicy.networking.k8s.io/kv-cache               app.kubernetes.io/instance=kv-cache,app.kubernetes.io/name=kv-cache   28m
+
+NAME                                            AGE
+servicemonitor.monitoring.coreos.com/kv-cache   28m
+
+NAME                                            AGE
+prometheusrule.monitoring.coreos.com/kv-cache   28m
+
+$ kubectl -n kv-cache get secret
+NAME            TYPE     DATA   AGE
+kv-cache-auth   Opaque   1      28m
+
+$ kubectl -n kv-cache get pods -o jsonpath={range .items[*]}{.metadata.name}{"  image="}{.spec.containers[0].image}{"  imageID="}{.status.containerStatuses[0].imageID}{"\n"}{end}
+kv-cache-5dbdf86874-5wfl5  image=ghcr.io/venki1402/kv-cache:326a537352014ec8451531b0544d42b1ca949a2c  imageID=ghcr.io/venki1402/kv-cache@sha256:41e4c8e1aaebbc942f23fb4d6436709bb5f535b22a23eeeea646c9466c047c2e
+
+$ kubectl get namespace kv-cache --show-labels
+NAME       STATUS   AGE   LABELS
+kv-cache   Active   28m   kubernetes.io/metadata.name=kv-cache,pod-security.kubernetes.io/enforce=restricted,pod-security.kubernetes.io/warn=restricted
+

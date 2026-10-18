@@ -24,7 +24,7 @@ run() { echo "\$ $*"; "$@" 2>&1 || true; echo; }
 } > "$E/k8s-resources.txt"
 
 ARGO_PW=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)
-argocd login argocd.localhost:8080 --plaintext --grpc-web --username admin --password "$ARGO_PW" >/dev/null
+argocd login argocd.localhost:8080 --plaintext --insecure --grpc-web --username admin --password "$ARGO_PW" >/dev/null
 unset ARGO_PW
 {
   echo "# captured $(date -u +%FT%TZ)"

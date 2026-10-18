@@ -1,0 +1,10 @@
+# captured 2026-10-18T16:44:12Z
+$ curl -si http://kv.localhost:8080/version
+HTTP/1.1 200 OK
+Content-Length: 126
+Content-Type: application/json
+Date: Sun, 18 Oct 2026 16:44:11 GMT
+Server: kv-cache
+X-App-Version: baseline-13-g326a537
+
+{"buildTime":"2026-10-18T21:51:45+05:30","commit":"326a537352014ec8451531b0544d42b1ca949a2c","version":"baseline-13-g326a537"}

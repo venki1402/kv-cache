@@ -1,0 +1,12 @@
+# captured 2026-10-18T16:44:25Z
+## app paths through the ingress
+/version -> 200
+/health -> 200
+/get?key=does-not-exist -> 404
+## /metrics and other paths through the ingress (expected 404: not routed)
+/metrics -> 404
+/healthz -> 404
+/readyz -> 404
+## host port exposure (expected: only 127.0.0.1:8080)
+6443/tcp -> 127.0.0.1:63916
+30080/tcp -> 127.0.0.1:8080

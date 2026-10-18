@@ -62,9 +62,16 @@ readonly-fs)
   cat > /tmp/kv-debug-profile.json <<'JSON'
 {"securityContext":{"runAsUser":65532,"runAsGroup":65532,"runAsNonRoot":true,"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"seccompProfile":{"type":"RuntimeDefault"}}}
 JSON
-  kubectl -n "$NS" debug "$POD" --image=busybox:1.37.0 --target=kv-cache --profile=restricted \
-    --custom=/tmp/kv-debug-profile.json -i --quiet -- \
-    sh -c 'ls /proc/1/root/; touch /proc/1/root/probe-write && echo "WRITE SUCCEEDED" || echo "write to / failed as expected"' 2>&1 || true
+  DBG=rofs-$(date +%s)
+  kubectl -n "$NS" debug "$POD" --container="$DBG" --image=busybox:1.37.0 --target=kv-cache --profile=restricted \
+    --custom=/tmp/kv-debug-profile.json --quiet -- \
+    sh -c 'ls /proc/1/root/; touch /proc/1/root/probe-write && echo "WRITE SUCCEEDED" || echo "write to / failed as expected"'
+  # Read the output from logs: attaching races with a container this short-lived.
+  for _ in $(seq 1 30); do
+    kubectl -n "$NS" get pod "$POD" -o jsonpath="{.status.ephemeralContainerStatuses[?(@.name=='$DBG')].state.terminated.reason}" | grep -q . && break
+    sleep 1
+  done
+  kubectl -n "$NS" logs "$POD" -c "$DBG"
   ;;
 *) echo "usage: $0 pod-delete|drain|readonly-fs" >&2; exit 2 ;;
 esac

@@ -1,0 +1,10 @@
+# captured 2026-10-18T16:44:12Z
+target: http://kv.localhost:8080
+ok   PUT without token -> 401
+ok   PUT with token -> {"status":"OK","message":"Key inserted/updated"}
+ok   GET -> {"status":"OK","key":"smoke-1792341852-30797","value":"v1"}
+ok   GET missing key -> 404
+ok   /version -> {"buildTime":"2026-10-18T21:51:45+05:30","commit":"326a537352014ec8451531b0544d42b1ca949a2c","version":"baseline-13-g326a537"}
+     X-App-Version: baseline-13-g326a537
+ok   /version commit matches 326a537352014ec8451531b0544d42b1ca949a2c
+PASS

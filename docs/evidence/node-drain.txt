@@ -1,0 +1,56 @@
+[16:38:08] setup: put Traefik on the control-plane and kv-cache on the worker, so draining the worker measures the app alone
+node/kvcache-worker cordoned
+pod "traefik-58548dfb6f-ddk2h" deleted from traefik namespace
+deployment "traefik" successfully rolled out
+node/kvcache-worker uncordoned
+node/kvcache-control-plane cordoned
+pod "kv-cache-5dbdf86874-szj8p" deleted from kv-cache namespace
+Waiting for deployment "kv-cache" rollout to finish: 0 of 1 updated replicas are available...
+deployment "kv-cache" successfully rolled out
+node/kvcache-control-plane uncordoned
+kv-cache kv-cache-5dbdf86874-p8pbs kvcache-worker
+kv-cache kv-cache-5dbdf86874-szj8p kvcache-control-plane
+traefik traefik-58548dfb6f-n66wj kvcache-control-plane
+[16:38:13] == drain kvcache-worker (the node running kv-cache)
+NAME                    STATUS   ROLES           AGE   VERSION
+kvcache-control-plane   Ready    control-plane   40m   v1.37.0
+kvcache-worker          Ready    <none>          39m   v1.37.0
+NAME                        READY   STATUS        RESTARTS   AGE    IP            NODE                    NOMINATED NODE   READINESS GATES
+kv-cache-5dbdf86874-p8pbs   1/1     Running       0          5s     10.244.1.22   kvcache-worker          <none>           <none>
+kv-cache-5dbdf86874-szj8p   1/1     Terminating   0          4m1s   10.244.0.12   kvcache-control-plane   <none>           <none>
+evicting pod kv-cache/kv-cache-5dbdf86874-p8pbs
+pod/kv-cache-5dbdf86874-p8pbs evicted
+node/kvcache-worker drained
+[16:38:26] kv-cache Ready on another node 13s after drain started
+[16:38:29] probe every 0.2s:       21 requests, 21 non-200
+[16:38:29] unavailable window: ~14.822s (codes:   21 000 )
+NAME                        READY   STATUS    RESTARTS   AGE   IP            NODE                    NOMINATED NODE   READINESS GATES
+kv-cache-5dbdf86874-98mpr   1/1     Running   0          16s   10.244.0.14   kvcache-control-plane   <none>           <none>
+node/kvcache-worker uncordoned
+
+[16:41:11] FIRST ATTEMPT INVALID: the Traefik replacement was still pulling its image on the control-plane when the drain started (rollout status returned before the new pod existed), so every probe above failed at the ingress, not at kv-cache. Re-run below with readiness checked explicitly.
+[16:41:11] setup 2: kv-cache onto the worker; Traefik stays on the control-plane (image now cached there)
+node/kvcache-control-plane cordoned
+pod "kv-cache-5dbdf86874-98mpr" deleted from kv-cache namespace
+pod/kv-cache-5dbdf86874-98mpr condition met
+pod/kv-cache-5dbdf86874-jfdvz condition met
+node/kvcache-control-plane uncordoned
+kv-cache kv-cache-5dbdf86874-98mpr 1/1 kvcache-control-plane
+kv-cache kv-cache-5dbdf86874-jfdvz 1/1 kvcache-worker
+traefik traefik-58548dfb6f-n66wj 1/1 kvcache-control-plane
+[16:41:30] == re-run
+[16:41:30] == drain kvcache-worker (the node running kv-cache)
+NAME                    STATUS   ROLES           AGE   VERSION
+kvcache-control-plane   Ready    control-plane   43m   v1.37.0
+kvcache-worker          Ready    <none>          43m   v1.37.0
+NAME                        READY   STATUS    RESTARTS   AGE   IP            NODE             NOMINATED NODE   READINESS GATES
+kv-cache-5dbdf86874-jfdvz   1/1     Running   0          19s   10.244.1.23   kvcache-worker   <none>           <none>
+evicting pod kv-cache/kv-cache-5dbdf86874-jfdvz
+pod/kv-cache-5dbdf86874-jfdvz evicted
+node/kvcache-worker drained
+[16:41:38] kv-cache Ready on another node 8s after drain started
+[16:41:41] probe every 0.2s:       45 requests, 8 non-200
+[16:41:41] unavailable window: ~1.777s (codes:    8 503 )
+NAME                        READY   STATUS    RESTARTS   AGE   IP            NODE                    NOMINATED NODE   READINESS GATES
+kv-cache-5dbdf86874-5wfl5   1/1     Running   0          10s   10.244.0.24   kvcache-control-plane   <none>           <none>
+node/kvcache-worker uncordoned

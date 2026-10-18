@@ -1,0 +1,31 @@
+# captured 2026-10-18T16:44:12Z
+## kvcache_build_info
+{"metric":{"__name__":"kvcache_build_info","commit":"326a537352014ec8451531b0544d42b1ca949a2c","container":"kv-cache","endpoint":"metrics","instance":"10.244.0.24:9091","job":"kv-cache","namespace":"kv-cache","pod":"kv-cache-5dbdf86874-5wfl5","service":"kv-cache","version":"baseline-13-g326a537"},"value":"1"}
+## scrape targets (kv-cache)
+{"job":"kv-cache","scrapeUrl":"http://10.244.0.24:9091/metrics","health":"up","lastScrape":"2026-10-18T16:44:03.443156967Z"}
+## all targets health
+   1 up apiserver
+   2 up coredns
+   1 up jaeger
+   2 up kps-alertmanager
+   1 up kps-grafana
+   1 up kps-operator
+   2 up kps-prometheus
+   1 up kube-state-metrics
+   6 up kubelet
+   1 up kv-cache
+   1 up monitoring/traefik
+   2 up node-exporter
+## kv-cache rule groups loaded
+{"name":"kv-cache.kubernetes","rules":6,"health":["ok"]}
+{"name":"kv-cache.recording","rules":9,"health":["ok"]}
+{"name":"kv-cache.slo","rules":3,"health":["ok"]}
+## currently firing kv-cache alerts
+[]
+## request rate by route (5m)
+{"route":"healthz","code":"200","rps":"0.025504000000000006"}
+{"route":"readyz","code":"200","rps":"0.05100800000000001"}
+{"route":"version","code":"200","rps":"0.004250666666666667"}
+{"route":"get","code":"404","rps":"0"}
+## get latency p99 (5m)
+[{"metric":{},"value":[1792341852.463,"0.000495"]}]

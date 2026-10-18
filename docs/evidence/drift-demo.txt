@@ -1,0 +1,15 @@
+[16:34:12] before: 1 replica(s); sync=Synced health=Healthy revision=240ba9da93dc55e9047b91a038a99ea8992e631c
+deployment.apps/kv-cache scaled
+[16:34:14] after: spec.replicas=1, reverted in 2s
+last sync revision=a963826f2acd2b12e933735fe5cdd607c4117675 at 2026-10-18T16:30:26Z
+[16:34:14] sync=Synced health=Healthy revision=240ba9da93dc55e9047b91a038a99ea8992e631c
+
+[16:34:25] pods right after the revert (the ReplicaSet scale-down removed the original pod, not one of the two new ones):
+NAME                        READY   STATUS        RESTARTS   AGE
+kv-cache-5dbdf86874-2nlxt   1/1     Terminating   0          2s
+kv-cache-5dbdf86874-szj8p   1/1     Running       0          2s
+kv-cache-5dbdf86874-vvnjm   1/1     Terminating   0          19s
+[16:34:25] pods now:
+NAME                        READY   STATUS    RESTARTS   AGE
+kv-cache-5dbdf86874-szj8p   1/1     Running   0          13s
+[16:34:25] GET of key "reliability" (not conclusive: it was already lost in the earlier pod-delete test; the pod names above show the original pod was replaced): {"status":"ERROR","message":"Key not found"} (404)
