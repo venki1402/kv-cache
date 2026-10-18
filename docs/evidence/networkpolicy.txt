@@ -1,0 +1,27 @@
+# captured 2026-10-18T16:44:12Z
+## from namespace default (expected: blocked by NetworkPolicy)
+$ kubectl run np-test-default -n default --rm -i --restart=Never --image=busybox:1.37.0 -- wget -q -T 3 -O - http://kv-cache.kv-cache.svc.cluster.local:7171/version
+All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.
+If you don't see a command prompt, try pressing enter.
+wget: download timed out
+pod "np-test-default" deleted from default namespace
+pod default/np-test-default terminated (Error)
+
+## from namespace traefik (expected: allowed)
+$ kubectl run np-test-traefik -n traefik --rm -i --restart=Never --image=busybox:1.37.0 -- wget -q -T 3 -O - http://kv-cache.kv-cache.svc.cluster.local:7171/version
+All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.
+If you don't see a command prompt, try pressing enter.
+{"buildTime":"2026-10-18T21:51:45+05:30","commit":"326a537352014ec8451531b0544d42b1ca949a2c","version":"baseline-13-g326a537"}pod "np-test-traefik" deleted from traefik namespace
+
+## metrics port from namespace traefik (expected: blocked, only monitoring may scrape)
+$ kubectl run np-test-metrics -n traefik --rm -i --restart=Never --image=busybox:1.37.0 -- wget -q -T 3 -O /dev/null http://kv-cache.kv-cache.svc.cluster.local:9091/metrics
+All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.
+If you don't see a command prompt, try pressing enter.
+wget: download timed out
+pod "np-test-metrics" deleted from traefik namespace
+pod traefik/np-test-metrics terminated (Error)
+
+## through the ingress (Traefik -> app)
+$ curl -s -o /dev/null -w %{http_code}\n http://kv.localhost:8080/version
+200
+

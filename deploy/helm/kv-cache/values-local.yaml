@@ -1,0 +1,11 @@
+# kind cluster managed by Argo CD. image.tag is bumped by the release job.
+image:
+  tag: "240ba9da93dc55e9047b91a038a99ea8992e631c"
+config:
+  # Debug adds one log line per request carrying trace_id, used for the
+  # log-to-trace link in Grafana.
+  logLevel: debug
+  otel:
+    enabled: true
+    endpoint: http://jaeger.observability.svc.cluster.local:4317
+    samplerArg: "1.0"

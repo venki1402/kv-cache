@@ -1,0 +1,11 @@
+# kind kubelets use self-signed serving certs.
+
+args:
+  - --kubelet-insecure-tls
+
+resources:
+  requests:
+    cpu: 20m
+    memory: 48Mi
+  limits:
+    memory: 128Mi

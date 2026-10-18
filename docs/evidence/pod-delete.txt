@@ -1,0 +1,13 @@
+[16:33:55] == delete the pod
+{"status":"OK","message":"Key inserted/updated"}
+{"status":"OK","key":"reliability","value":"survives?"} (200)
+NAME                        READY   STATUS    RESTARTS   AGE     IP            NODE                    NOMINATED NODE   READINESS GATES
+kv-cache-5dbdf86874-g2rpv   1/1     Running   0          3m29s   10.244.0.11   kvcache-control-plane   <none>           <none>
+pod "kv-cache-5dbdf86874-g2rpv" deleted from kv-cache namespace
+[16:34:03] replacement pod Ready 8s after delete
+[16:34:06] probe every 0.2s:       47 requests, 22 non-200
+[16:34:06] unavailable window: ~4.944s (codes:   22 503 )
+NAME                        READY   STATUS    RESTARTS   AGE   IP            NODE             NOMINATED NODE   READINESS GATES
+kv-cache-5dbdf86874-vvnjm   1/1     Running   0          11s   10.244.1.19   kvcache-worker   <none>           <none>
+[16:34:06] GET after restart (expected 404: the cache is in-memory and starts cold by design)
+{"status":"ERROR","message":"Key not found"} (404)

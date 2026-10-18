@@ -1,0 +1,24 @@
+[16:22:39] == read-only root filesystem on kv-cache-7b8b8754f5-fw69t
+{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsNonRoot":true,"runAsUser":65532,"seccompProfile":{"type":"RuntimeDefault"}}
+[16:22:39] exec into the app container (distroless: no shell, so exec itself fails)
+Defaulted container "kv-cache" out of: kv-cache, debugger-lhv94 (ephem)
+error: Internal error occurred: Internal error occurred: error executing command in container: failed to exec in container: failed to start exec "f71e974882cb842727ad0be823cf307d956d234d340e01841321ff2a06d031bc": OCI runtime exec failed: exec failed: unable to start container process: exec: "sh": executable file not found in $PATH
+[16:22:39] ephemeral debug container as the same UID, writing into the app's root fs via /proc/1/root
+bin
+boot
+dev
+etc
+home
+kv-cache
+lib
+proc
+product_uuid
+root
+run
+sbin
+sys
+tmp
+usr
+var
+touch: /proc/1/root/probe-write: Read-only file system
+write to / failed as expected

@@ -1,0 +1,288 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [devops, main]
+    # The release job commits this file; ignoring it is a second guard
+    # against release loops besides [skip ci].
+    paths-ignore:
+      - deploy/helm/kv-cache/values-local.yaml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GO_VERSION: "1.26.9"
+  IMAGE: ghcr.io/venki1402/kv-cache
+  # On pull_request, github.sha is a synthetic merge commit; build and test
+  # the PR head so the image commit matches a real commit.
+  SRC_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.SRC_SHA }}
+          fetch-depth: 0
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: go vet
+        run: go vet ./...
+
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.15.0
+
+      - name: go test (race, coverage)
+        run: |
+          go test -race -coverprofile=coverage.out ./...
+          {
+            echo '### Coverage'
+            echo '```'
+            go tool cover -func=coverage.out
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage
+          path: coverage.out
+
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.1
+
+      - name: Install kubeconform
+        run: |
+          curl -sSfL -o /tmp/kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz
+          echo "9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883  /tmp/kubeconform.tar.gz" | sha256sum -c -
+          sudo tar -xzf /tmp/kubeconform.tar.gz -C /usr/local/bin kubeconform
+
+      - name: helm lint and kubeconform (local and prod values)
+        run: |
+          mkdir -p rendered
+          for env in local prod; do
+            helm lint deploy/helm/kv-cache -f deploy/helm/kv-cache/values-$env.yaml
+            helm template kv-cache deploy/helm/kv-cache -n kv-cache \
+              -f deploy/helm/kv-cache/values-$env.yaml > rendered/$env.yaml
+            kubeconform -strict -summary \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+              rendered/$env.yaml
+          done
+          cp Dockerfile rendered/
+
+      - name: trivy config (chart and Dockerfile)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: rendered
+          version: v0.76.0
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+  build:
+    needs: checks
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.SRC_SHA }}
+          fetch-depth: 0
+
+      - name: Version metadata
+        id: meta
+        run: |
+          {
+            echo "version=$(git describe --tags --always)"
+            echo "short=${SRC_SHA::7}"
+            echo "build_time=$(git show -s --format=%cI "$SRC_SHA")"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build amd64 image for e2e and scanning
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+            COMMIT=${{ env.SRC_SHA }}
+            BUILD_TIME=${{ steps.meta.outputs.build_time }}
+          tags: ${{ env.IMAGE }}:${{ env.SRC_SHA }}
+          outputs: type=docker,dest=${{ runner.temp }}/image.tar
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image
+          path: ${{ runner.temp }}/image.tar
+          retention-days: 1
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push multi-arch image
+        if: github.event_name == 'push'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+            COMMIT=${{ env.SRC_SHA }}
+            BUILD_TIME=${{ steps.meta.outputs.build_time }}
+          tags: |
+            ${{ env.IMAGE }}:${{ env.SRC_SHA }}
+            ${{ env.IMAGE }}:sha-${{ steps.meta.outputs.short }}
+          push: true
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+
+      - name: trivy image (pushed)
+        if: github.event_name == 'push'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE }}:${{ env.SRC_SHA }}
+          version: v0.76.0
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: trivy image (local build)
+        if: github.event_name != 'push'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          input: ${{ runner.temp }}/image.tar
+          version: v0.76.0
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+  e2e:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.SRC_SHA }}
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: image
+          path: ${{ runner.temp }}
+
+      - uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
+        with:
+          version: v0.33.0
+          node_image: kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+          cluster_name: e2e
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.1
+
+      - name: Load the image built in this run
+        run: kind load image-archive "$RUNNER_TEMP/image.tar" --name e2e
+
+      - name: Install chart
+        run: |
+          kubectl create namespace kv-cache
+          kubectl label namespace kv-cache pod-security.kubernetes.io/enforce=restricted
+          token=$(openssl rand -hex 24)
+          echo "::add-mask::$token"
+          kubectl -n kv-cache create secret generic kv-cache-auth --from-literal=token="$token"
+          # CRD-backed resources and the ingress need the platform stack, which
+          # this ephemeral cluster does not run.
+          helm install kv-cache deploy/helm/kv-cache -n kv-cache \
+            --set image.tag="$SRC_SHA" \
+            --set serviceMonitor.enabled=false \
+            --set prometheusRule.enabled=false \
+            --set dashboard.enabled=false \
+            --set ingress.enabled=false \
+            --wait --timeout 3m
+
+      - name: Smoke test
+        run: |
+          kubectl -n kv-cache port-forward svc/kv-cache 7171:7171 >/tmp/pf.log 2>&1 &
+          for _ in $(seq 1 30); do curl -sf localhost:7171/healthz >/dev/null && break; sleep 1; done
+          AUTH_TOKEN=$(kubectl -n kv-cache get secret kv-cache-auth -o jsonpath='{.data.token}' | base64 -d)
+          echo "::add-mask::$AUTH_TOKEN"
+          BASE_URL=http://localhost:7171 AUTH_TOKEN="$AUTH_TOKEN" EXPECTED_SHA="$SRC_SHA" scripts/smoke.sh
+
+      - name: Diagnostics
+        if: failure()
+        run: |
+          kubectl -n kv-cache get all,events
+          kubectl -n kv-cache describe pods
+          kubectl -n kv-cache logs deploy/kv-cache --tail=100 || true
+
+  release:
+    needs: e2e
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    # Required reviewers on this environment are the manual approval gate.
+    environment: production
+    permissions:
+      contents: write
+    concurrency:
+      group: release-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Bump image tag in values-local.yaml
+        run: |
+          yq -i ".image.tag = \"$SRC_SHA\"" deploy/helm/kv-cache/values-local.yaml
+          git diff --stat
+
+      - name: Commit and push release
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy/helm/kv-cache/values-local.yaml
+          if git diff --cached --quiet; then
+            echo "image tag already at $SRC_SHA"; exit 0
+          fi
+          git commit -m "chore(release): deploy ${SRC_SHA::7} [skip ci]"
+          # Another push may have landed since checkout.
+          pushed=false
+          for _ in 1 2 3; do
+            if git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME"; then
+              pushed=true; break
+            fi
+            sleep 5
+          done
+          $pushed || { echo "release push failed"; exit 1; }
+          echo "released $SRC_SHA" >> "$GITHUB_STEP_SUMMARY"

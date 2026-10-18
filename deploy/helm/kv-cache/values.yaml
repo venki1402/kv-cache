@@ -1,0 +1,85 @@
+image:
+  repository: ghcr.io/venki1402/kv-cache
+  # Full git SHA of the commit the image was built from; set per environment.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+fullnameOverride: kv-cache
+
+config:
+  logLevel: info
+  # 128 MiB here, not in code: the binary keeps its 1 GiB default for
+  # non-Kubernetes users, while the pod limit below needs headroom above
+  # the cached bytes for Go runtime and map overhead.
+  maxMemoryBytes: "134217728"
+  # Seconds the app keeps serving after SIGTERM with readiness already false.
+  shutdownDelay: 1s
+  # Fault drills only.
+  failReadiness: false
+  otel:
+    enabled: false
+    endpoint: ""
+    samplerArg: "1.0"
+
+auth:
+  # Secret holding the bearer token under key "token". The chart never
+  # contains the token itself.
+  existingSecret: kv-cache-auth
+  secretKey: token
+
+service:
+  port: 7171
+  metricsPort: 9091
+
+ingress:
+  enabled: true
+  className: traefik
+  host: kv.localhost
+  # Only public API paths are routed; /metrics is on a separate port and
+  # never reachable from outside.
+  paths: [/get, /put, /version, /health]
+  tls: []
+
+# No CPU limit: CFS quota throttling adds tail latency to a latency-sensitive
+# service, and the CPU request already guarantees its share under contention.
+resources:
+  requests:
+    cpu: 100m
+    memory: 192Mi
+  limits:
+    memory: 256Mi
+
+probes:
+  readiness:
+    periodSeconds: 5
+    failureThreshold: 2
+    timeoutSeconds: 2
+  liveness:
+    periodSeconds: 10
+    failureThreshold: 3
+    timeoutSeconds: 2
+
+terminationGracePeriodSeconds: 30
+preStopSleepSeconds: 5
+# Short deadline so a stuck rollout is reported as Degraded within minutes.
+progressDeadlineSeconds: 120
+
+podAnnotations: {}
+
+serviceMonitor:
+  enabled: true
+  interval: 15s
+
+prometheusRule:
+  enabled: true
+
+dashboard:
+  enabled: true
+
+networkPolicy:
+  enabled: true
+  ingressControllerNamespace: traefik
+  monitoringNamespace: monitoring
+  tracing:
+    namespace: observability
+    port: 4317

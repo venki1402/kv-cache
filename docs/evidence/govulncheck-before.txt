@@ -1,0 +1,132 @@
+=== Symbol Results ===
+
+Vulnerability #1: GO-2026-6617
+    HTTP/2 server crash due to HPACK encoder race in net/http
+  More info: https://pkg.go.dev/vuln/GO-2026-6617
+  Module: golang.org/x/net
+    Found in: golang.org/x/net@v0.59.0
+    Fixed in: golang.org/x/net@v0.60.0
+    Example traces found:
+      #1: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.ConnectionError.Error
+      #2: tracing.go:12:2: kv.init calls propagation.init, which eventually calls http2.ErrCode.String
+      #3: tracing.go:12:2: kv.init calls propagation.init, which eventually calls http2.FrameHeader.String
+      #4: tracing.go:12:2: kv.init calls propagation.init, which eventually calls http2.FrameType.String
+      #5: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.ReadFrame
+      #6: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.ReadFrameForHeader
+      #7: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.ReadFrameHeader
+      #8: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteContinuation
+      #9: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteGoAway
+      #10: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteHeaders
+      #11: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WritePing
+      #12: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteRSTStream
+      #13: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteSettings
+      #14: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteSettingsAck
+      #15: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteWindowUpdate
+      #16: tracing.go:12:2: kv.init calls propagation.init, which eventually calls http2.SettingID.String
+      #17: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.SettingsFrame.ForeachSetting
+      #18: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.StreamError.Error
+      #19: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.connError.Error
+      #20: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.duplicatePseudoHeaderError.Error
+      #21: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.headerFieldNameError.Error
+      #22: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.headerFieldValueError.Error
+      #23: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.pseudoHeaderError.Error
+
+Vulnerability #2: GO-2026-6612
+    Double flow control refund on HTTP/2 server streams in net/http
+  More info: https://pkg.go.dev/vuln/GO-2026-6612
+  Module: golang.org/x/net
+    Found in: golang.org/x/net@v0.59.0
+    Fixed in: golang.org/x/net@v0.60.0
+    Example traces found:
+      #1: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.ConnectionError.Error
+      #2: tracing.go:12:2: kv.init calls propagation.init, which eventually calls http2.ErrCode.String
+      #3: tracing.go:12:2: kv.init calls propagation.init, which eventually calls http2.FrameHeader.String
+      #4: tracing.go:12:2: kv.init calls propagation.init, which eventually calls http2.FrameType.String
+      #5: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.ReadFrame
+      #6: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.ReadFrameForHeader
+      #7: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.ReadFrameHeader
+      #8: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteContinuation
+      #9: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteGoAway
+      #10: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteHeaders
+      #11: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WritePing
+      #12: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteRSTStream
+      #13: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteSettings
+      #14: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteSettingsAck
+      #15: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteWindowUpdate
+      #16: tracing.go:12:2: kv.init calls propagation.init, which eventually calls http2.SettingID.String
+      #17: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.SettingsFrame.ForeachSetting
+      #18: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.StreamError.Error
+      #19: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.connError.Error
+      #20: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.duplicatePseudoHeaderError.Error
+      #21: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.headerFieldNameError.Error
+      #22: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.headerFieldValueError.Error
+      #23: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.pseudoHeaderError.Error
+
+Vulnerability #3: GO-2026-6611
+    Excessive CPU consumption from repeated initial window changes in net/http
+  More info: https://pkg.go.dev/vuln/GO-2026-6611
+  Module: golang.org/x/net
+    Found in: golang.org/x/net@v0.59.0
+    Fixed in: golang.org/x/net@v0.60.0
+    Example traces found:
+      #1: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.ConnectionError.Error
+      #2: tracing.go:12:2: kv.init calls propagation.init, which eventually calls http2.ErrCode.String
+      #3: tracing.go:12:2: kv.init calls propagation.init, which eventually calls http2.FrameHeader.String
+      #4: tracing.go:12:2: kv.init calls propagation.init, which eventually calls http2.FrameType.String
+      #5: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.ReadFrame
+      #6: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.ReadFrameForHeader
+      #7: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.ReadFrameHeader
+      #8: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteContinuation
+      #9: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteGoAway
+      #10: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteHeaders
+      #11: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WritePing
+      #12: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteRSTStream
+      #13: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteSettings
+      #14: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteSettingsAck
+      #15: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteWindowUpdate
+      #16: tracing.go:12:2: kv.init calls propagation.init, which eventually calls http2.SettingID.String
+      #17: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.SettingsFrame.ForeachSetting
+      #18: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.StreamError.Error
+      #19: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.connError.Error
+      #20: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.duplicatePseudoHeaderError.Error
+      #21: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.headerFieldNameError.Error
+      #22: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.headerFieldValueError.Error
+      #23: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.pseudoHeaderError.Error
+
+Vulnerability #4: GO-2026-6603
+    HTTP/2 server memory exhaustion due to Trailer headers in net/http
+  More info: https://pkg.go.dev/vuln/GO-2026-6603
+  Module: golang.org/x/net
+    Found in: golang.org/x/net@v0.59.0
+    Fixed in: golang.org/x/net@v0.60.0
+    Example traces found:
+      #1: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.ConnectionError.Error
+      #2: tracing.go:12:2: kv.init calls propagation.init, which eventually calls http2.ErrCode.String
+      #3: tracing.go:12:2: kv.init calls propagation.init, which eventually calls http2.FrameHeader.String
+      #4: tracing.go:12:2: kv.init calls propagation.init, which eventually calls http2.FrameType.String
+      #5: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.ReadFrame
+      #6: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.ReadFrameForHeader
+      #7: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.ReadFrameHeader
+      #8: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteContinuation
+      #9: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteGoAway
+      #10: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteHeaders
+      #11: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WritePing
+      #12: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteRSTStream
+      #13: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteSettings
+      #14: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteSettingsAck
+      #15: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.Framer.WriteWindowUpdate
+      #16: tracing.go:12:2: kv.init calls propagation.init, which eventually calls http2.SettingID.String
+      #17: main.go:19:2: kv.init calls fasthttp.init, which eventually calls http2.SettingsFrame.ForeachSetting
+      #18: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.StreamError.Error
+      #19: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.connError.Error
+      #20: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.duplicatePseudoHeaderError.Error
+      #21: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.headerFieldNameError.Error
+      #22: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.headerFieldValueError.Error
+      #23: main.go:219:32: kv.init#1 calls json.Marshal, which eventually calls http2.pseudoHeaderError.Error
+
+Your code is affected by 4 vulnerabilities from 1 module.
+This scan also found 1 vulnerability in packages you import and 0
+vulnerabilities in modules you require, but your code doesn't appear to call
+these vulnerabilities.
+Use '-show verbose' for more details.
+exit status 3

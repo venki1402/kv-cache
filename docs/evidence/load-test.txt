@@ -1,0 +1,54 @@
+[16:32:57] seeding 100 keys
+[16:32:57] hey -z 30s -c 50 GET http://kv.localhost:8080/get?key=load42 (sha 326a537352014ec8451531b0544d42b1ca949a2c)
+
+Summary:
+  Total:	30.0013 secs
+  Slowest:	0.0309 secs
+  Fastest:	0.0003 secs
+  Average:	0.0021 secs
+  Requests/sec:	23316.7405
+  
+  Total data:	34277068 bytes
+  Size/request:	49 bytes
+
+Response time histogram:
+  0.000 [1]	|
+  0.003 [622541]	|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.006 [69306]	|■■■■
+  0.009 [5906]	|
+  0.013 [1080]	|
+  0.016 [345]	|
+  0.019 [192]	|
+  0.022 [96]	|
+  0.025 [9]	|
+  0.028 [8]	|
+  0.031 [48]	|
+
+
+Latency distribution:
+  10%% in 0.0011 secs
+  25%% in 0.0014 secs
+  50%% in 0.0019 secs
+  75%% in 0.0025 secs
+  90%% in 0.0034 secs
+  95%% in 0.0042 secs
+  99%% in 0.0066 secs
+
+Details (average, fastest, slowest):
+  DNS+dialup:	0.0000 secs, 0.0000 secs, 0.0043 secs
+  DNS-lookup:	0.0000 secs, 0.0000 secs, 0.0023 secs
+  req write:	0.0000 secs, 0.0000 secs, 0.0031 secs
+  resp wait:	0.0021 secs, 0.0003 secs, 0.0309 secs
+  resp read:	0.0000 secs, 0.0000 secs, 0.0042 secs
+
+Status code distribution:
+  [200]	699532 responses
+
+
+
+
+## Prometheus during the run (5m windows)
+get p99 (s): 0.0004975142373403109
+get p95 (s): 0.0004774126519932276
+error ratio 5m: 0
+pod memory working set: kv-cache-5dbdf86874-g2rpv   1156m   57Mi   

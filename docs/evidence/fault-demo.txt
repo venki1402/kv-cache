@@ -1,0 +1,62 @@
+[16:34:38] == baseline
+[16:34:38] deployed image sha: 326a537352014ec8451531b0544d42b1ca949a2c
+[16:34:39] argo: sync=Synced health=Healthy revision=240ba9da93dc55e9047b91a038a99ea8992e631c
+NAME                        READY   STATUS    RESTARTS   AGE   IP            NODE                    NOMINATED NODE   READINESS GATES
+kv-cache-5dbdf86874-szj8p   1/1     Running   0          27s   10.244.0.12   kvcache-control-plane   <none>           <none>
+[16:34:39] == 1. bad release: failReadiness=true via a values commit
+Created autostash: 04ed712
+Applied autostash.
+remote: This repository moved. Please use the new location:        
+remote:   git@github.com:venki1402/kv-cache.git        
+[16:34:44] pushed bad commit 67faf39ea19d31d66030a05146e618d279904a98
+[16:34:48] argo synced bad commit (after 4s)
+[16:34:48] == 2. symptoms
+[16:34:48] new pod created and not ready (after 0s)
+NAME                        READY   STATUS    RESTARTS   AGE   IP            NODE                    NOMINATED NODE   READINESS GATES
+kv-cache-5dbdf86874-szj8p   1/1     Running   0          36s   10.244.0.12   kvcache-control-plane   <none>           <none>
+kv-cache-744f4656c6-pvl87   0/1     Running   0          2s    10.244.1.21   kvcache-worker          <none>           <none>
+Waiting for deployment "kv-cache" rollout to finish: 1 old replicas are pending termination...
+error: timed out waiting for the condition
+[16:35:08] rollout stalled as expected
+[16:35:08] old pod still serving: {"buildTime":"2026-10-18T21:51:45+05:30","commit":"326a537352014ec8451531b0544d42b1ca949a2c","version":"baseline-13-g326a537"}
+[16:36:49] argo health Degraded (after 101s)
+[16:36:49] argo: sync=Synced health=Degraded revision=67faf39ea19d31d66030a05146e618d279904a98
+[16:37:04] KvCachePodNotReady firing (after 15s)
+[16:37:04] alert fired 140s after the bad push
+{"alertname":"KvCachePodNotReady","state":"firing","severity":"critical","activeAt":"2026-10-18T16:35:01.996922794Z"}
+{"alertname":"KvCacheRolloutStuck","state":"pending","severity":"warning","activeAt":"2026-10-18T16:35:01.996922794Z"}
+{"alertname":"KubePodNotReady","state":"pending","severity":"warning","activeAt":"2026-10-18T16:35:12.901152854Z"}
+[16:37:04] == 3. recover: git revert
+Created autostash: c5d606f
+Applied autostash.
+remote: This repository moved. Please use the new location:        
+remote:   git@github.com:venki1402/kv-cache.git        
+[16:37:10] pushed revert fa0d8bfe88386a520f7a44654dadb070e10e5f65
+[16:37:13] argo synced revert (after 3s)
+deployment "kv-cache" successfully rolled out
+[16:37:13] rollout complete 3s after the revert push
+[16:37:13] argo health Healthy (after 0s)
+[16:37:32] KvCachePodNotReady resolved (after 19s)
+[16:37:32] alert resolved 22s after the revert push
+[16:37:32] == 4. verify
+NAME                        READY   STATUS    RESTARTS   AGE     IP            NODE                    NOMINATED NODE   READINESS GATES
+kv-cache-5dbdf86874-szj8p   1/1     Running   0          3m20s   10.244.0.12   kvcache-control-plane   <none>           <none>
+[16:37:32] argo: sync=Synced health=Healthy revision=fa0d8bfe88386a520f7a44654dadb070e10e5f65
+target: http://kv.localhost:8080
+ok   PUT without token -> 401
+ok   PUT with token -> {"status":"OK","message":"Key inserted/updated"}
+ok   GET -> {"status":"OK","key":"smoke-1792341452-7827","value":"v1"}
+ok   GET missing key -> 404
+ok   /version -> {"buildTime":"2026-10-18T21:51:45+05:30","commit":"326a537352014ec8451531b0544d42b1ca949a2c","version":"baseline-13-g326a537"}
+     X-App-Version: baseline-13-g326a537
+ok   /version commit matches 326a537352014ec8451531b0544d42b1ca949a2c
+PASS
+[16:37:32] 5xx rate (Prometheus): 0.1
+scripts/fault-demo.sh: line 74: 99309 Terminated: 15          ( while true; do
+    echo "$(date +%s) $(curl -s -o /dev/null -m 2 -w '%{http_code}' "$INGRESS/version")"; sleep 1;
+done ) > "$PROBE"
+[16:37:32] == public probe during the whole demo:      169 requests,        0 non-200
+[16:37:32] summary: alert fired after 140s; rollout healthy 3s after revert push
+5xx by route/pod over the demo window (increase 10m):
+{"route":"readyz","code":"503","pod":"kv-cache-744f4656c6-pvl87","count":"30"}
+SLO error ratio (probes excluded) 5m: 0

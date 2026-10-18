@@ -1,0 +1,16 @@
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "kv-cache.fullname" . }}
+  labels:
+    {{- include "kv-cache.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "kv-cache.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: {{ .Values.serviceMonitor.interval }}
+{{- end }}

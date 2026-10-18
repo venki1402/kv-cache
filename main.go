@@ -2,14 +2,23 @@ package main
 
 import (
 	"container/list"
+	"context"
+	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log"
+	"os"
+	"os/signal"
 	"runtime"
+	"runtime/debug"
 	"sync"
+	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/valyala/fasthttp"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -86,6 +95,11 @@ func (c *ShardedCache) getShard(key string) *Shard {
 }
 
 func (c *ShardedCache) Put(key, value string) error {
+	return c.put(context.Background(), key, value)
+}
+
+// ctx is only used to parent the eviction span when tracing is enabled.
+func (c *ShardedCache) put(ctx context.Context, key, value string) error {
 	if len(key) > MaxKeySize || len(value) > MaxValueSize {
 		return fmt.Errorf("key or value exceeds maximum size")
 	}
@@ -116,7 +130,12 @@ func (c *ShardedCache) Put(key, value string) error {
 		shard.currentSize += entrySize
 	}
 
+	var evictSpan trace.Span
+	evicted := 0
 	for shard.currentSize > shard.maxSize && shard.evictList.Len() > 0 {
+		if evictSpan == nil && tracingEnabled {
+			_, evictSpan = tracer.Start(ctx, "cache.evict")
+		}
 		backElem := shard.evictList.Back()
 		if backElem != nil {
 			evictEntry := backElem.Value.(*CacheEntry)
@@ -124,7 +143,15 @@ func (c *ShardedCache) Put(key, value string) error {
 			delete(shard.items, evictEntry.key)
 			shard.evictList.Remove(backElem)
 			shard.currentSize -= evictEntry.size
+			evicted++
 		}
+	}
+	if evicted > 0 {
+		cacheEvictions.Add(float64(evicted))
+	}
+	if evictSpan != nil {
+		evictSpan.SetAttributes(attribute.Int("cache.evicted", evicted))
+		evictSpan.End()
 	}
 
 	return nil
@@ -138,13 +165,38 @@ func (c *ShardedCache) Get(key string) (string, bool) {
 
 	if element, found := shard.items[key]; found {
 		shard.evictList.MoveToFront(element)
+		cacheHits.Inc()
 		return element.Value.(*CacheEntry).value, true
 	}
 
+	cacheMisses.Inc()
 	return "", false
 }
 
-var cache *ShardedCache
+func (c *ShardedCache) Stats() (bytes int64, keys int) {
+	for _, shard := range c.shards {
+		shard.lock.Lock()
+		bytes += shard.currentSize
+		keys += len(shard.items)
+		shard.lock.Unlock()
+	}
+	return bytes, keys
+}
+
+func (c *ShardedCache) shardIndex(key string) int {
+	return int(djb2Hash(key) & c.shardMask)
+}
+
+var (
+	cache *ShardedCache
+
+	authToken string
+	ready     atomic.Bool
+	// Only for fault drills: lets a release fail readiness on purpose.
+	failReadiness bool
+
+	versionBytes []byte
+)
 
 // Pre-marshaled responses for hot/static paths — avoids per-request
 // allocation and formatting (fmt.Fprintf / json.Marshal) on responses
@@ -158,7 +210,38 @@ var (
 	keyNotFoundBytes  = []byte(`{"status":"ERROR","message":"Key not found"}`)
 	notFoundBytes     = []byte(`{"status":"ERROR","message":"Endpoint not found"}`)
 	healthOKBytes     = []byte(`{"status":"healthy"}`)
+	unauthorizedBytes = []byte(`{"status":"ERROR","message":"Unauthorized"}`)
+	readyBytes        = []byte(`{"status":"ready"}`)
+	notReadyBytes     = []byte(`{"status":"not ready"}`)
 )
+
+func init() {
+	versionBytes, _ = json.Marshal(map[string]string{
+		"version":   version,
+		"commit":    commit,
+		"buildTime": buildTime,
+	})
+}
+
+// Only writes are protected. Reads are side-effect free, the Service is
+// ClusterIP behind a NetworkPolicy, and an extra header check would cost
+// latency on the hottest path.
+func authorized(ctx *fasthttp.RequestCtx) bool {
+	if authToken == "" {
+		return true
+	}
+	got := ctx.Request.Header.Peek("Authorization")
+	want := "Bearer " + authToken
+	return subtle.ConstantTimeCompare(got, []byte(want)) == 1
+}
+
+func cacheSpan(ctx *fasthttp.RequestCtx, op, key string) (context.Context, trace.Span) {
+	if !tracingEnabled {
+		return context.Background(), nil
+	}
+	return tracer.Start(requestContext(ctx), "cache."+op,
+		trace.WithAttributes(attribute.Int("cache.shard", cache.shardIndex(key))))
+}
 
 func requestHandler(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set("Content-Type", "application/json")
@@ -166,6 +249,12 @@ func requestHandler(ctx *fasthttp.RequestCtx) {
 	switch string(ctx.Method()) {
 	case "POST", "PUT":
 		if string(ctx.Path()) == "/put" {
+			if !authorized(ctx) {
+				ctx.SetStatusCode(fasthttp.StatusUnauthorized)
+				ctx.SetBody(unauthorizedBytes)
+				return
+			}
+
 			var req PutRequest
 			if err := json.Unmarshal(ctx.PostBody(), &req); err != nil {
 				ctx.SetStatusCode(fasthttp.StatusBadRequest)
@@ -179,7 +268,12 @@ func requestHandler(ctx *fasthttp.RequestCtx) {
 				return
 			}
 
-			if err := cache.Put(req.Key, req.Value); err != nil {
+			spanCtx, span := cacheSpan(ctx, "put", req.Key)
+			err := cache.put(spanCtx, req.Key, req.Value)
+			if span != nil {
+				span.End()
+			}
+			if err != nil {
 				ctx.SetStatusCode(fasthttp.StatusBadRequest)
 				ctx.SetBody(sizeExceededBytes)
 				return
@@ -196,6 +290,26 @@ func requestHandler(ctx *fasthttp.RequestCtx) {
 			ctx.SetBody(healthOKBytes)
 			return
 		}
+		if string(ctx.Path()) == "/healthz" {
+			ctx.SetStatusCode(fasthttp.StatusOK)
+			ctx.SetBody(healthOKBytes)
+			return
+		}
+		if string(ctx.Path()) == "/readyz" {
+			if ready.Load() && !failReadiness {
+				ctx.SetStatusCode(fasthttp.StatusOK)
+				ctx.SetBody(readyBytes)
+			} else {
+				ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
+				ctx.SetBody(notReadyBytes)
+			}
+			return
+		}
+		if string(ctx.Path()) == "/version" {
+			ctx.SetStatusCode(fasthttp.StatusOK)
+			ctx.SetBody(versionBytes)
+			return
+		}
 		if string(ctx.Path()) == "/get" {
 			key := string(ctx.QueryArgs().Peek("key"))
 			if key == "" {
@@ -204,7 +318,13 @@ func requestHandler(ctx *fasthttp.RequestCtx) {
 				return
 			}
 
-			if value, found := cache.Get(key); found {
+			_, span := cacheSpan(ctx, "get", key)
+			value, found := cache.Get(key)
+			if span != nil {
+				span.SetAttributes(attribute.Bool("cache.hit", found))
+				span.End()
+			}
+			if found {
 				ctx.SetStatusCode(fasthttp.StatusOK)
 
 				respJSON, _ := json.Marshal(GetResponse{
@@ -226,20 +346,89 @@ func requestHandler(ctx *fasthttp.RequestCtx) {
 }
 
 func main() {
+	if err := run(); err != nil {
+		logger.Error("fatal", "error", err.Error())
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+	setupLogger(cfg.LogLevel)
+
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	cache = NewShardedCache(NumShards, MaxMemoryBytes)
+	if cfg.SoftMemoryLimit > 0 {
+		debug.SetMemoryLimit(cfg.SoftMemoryLimit)
+	}
+	cache = NewShardedCache(NumShards, cfg.MaxMemoryBytes)
+	maxBytes.Set(float64(cfg.MaxMemoryBytes))
+	authToken = cfg.AuthToken
+	failReadiness = cfg.FailReadiness
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+
+	handler := instrument(requestHandler)
+	shutdownTracing := func(context.Context) error { return nil }
+	if cfg.OTelEnabled {
+		shutdownTracing, err = setupTracing(ctx, cfg.OTelSampleRate)
+		if err != nil {
+			return fmt.Errorf("tracing setup: %w", err)
+		}
+		handler = traced(handler)
+	}
 
 	s := &fasthttp.Server{
-		Handler:              requestHandler,
-		Name:                 "kv-cache",
-		ReadTimeout:          5 * time.Second,
-		WriteTimeout:         5 * time.Second,
-		MaxConnsPerIP:        0,
-		MaxKeepaliveDuration: 60 * time.Second,
+		Handler:       handler,
+		Name:          "kv-cache",
+		ReadTimeout:   5 * time.Second,
+		WriteTimeout:  5 * time.Second,
+		MaxConnsPerIP: 0,
+	}
+	ms := &fasthttp.Server{
+		Handler:      metricsHandler(),
+		Name:         "kv-cache-metrics",
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
 	}
 
-	log.Printf("Starting kv-cache server on :7171")
-	if err := s.ListenAndServe(":7171"); err != nil {
-		log.Fatalf("Server Error: %s", err)
+	errCh := make(chan error, 2)
+	go func() { errCh <- ms.ListenAndServe(":" + cfg.MetricsPort) }()
+	go func() { errCh <- s.ListenAndServe(":" + cfg.Port) }()
+
+	ready.Store(true)
+	logger.Info("starting kv-cache server",
+		"port", cfg.Port,
+		"metrics_port", cfg.MetricsPort,
+		"max_memory_bytes", cfg.MaxMemoryBytes,
+		"auth_enabled", cfg.AuthToken != "",
+		"tracing_enabled", cfg.OTelEnabled,
+		"build_time", buildTime)
+
+	select {
+	case err := <-errCh:
+		return fmt.Errorf("server error: %w", err)
+	case <-ctx.Done():
 	}
+
+	// Stop receiving new traffic first, then drain in-flight requests.
+	ready.Store(false)
+	logger.Info("shutdown started", "delay", cfg.ShutdownDelay.String())
+	time.Sleep(cfg.ShutdownDelay)
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	errs := []error{
+		s.ShutdownWithContext(shutdownCtx),
+		ms.ShutdownWithContext(shutdownCtx),
+		shutdownTracing(shutdownCtx),
+	}
+	if err := errors.Join(errs...); err != nil {
+		return fmt.Errorf("shutdown: %w", err)
+	}
+	logger.Info("shutdown complete")
+	return nil
 }

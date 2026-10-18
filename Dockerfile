@@ -1,39 +1,38 @@
-# builder stage
-FROM golang:1.24-alpine AS builder
+# syntax=docker/dockerfile:1
 
-# Create an unprivileged user for security
-RUN adduser -D -g '' cacheuser
+# The builder runs on the host platform and cross-compiles, so multi-arch
+# builds need no QEMU emulation.
+FROM --platform=$BUILDPLATFORM golang:1.26.9-alpine@sha256:3082400e369fa24d5fc60bca20edab3f6d604e0c5a690ec66b295eff4dd87ade AS builder
 
-WORKDIR /app
+ARG TARGETOS
+ARG TARGETARCH
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_TIME=unknown
 
-# Copy dependency files first to leverage Docker layer caching
+WORKDIR /src
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
-# Copy the rest of the source code
-COPY . .
+COPY *.go ./
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -trimpath \
+      -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.buildTime=${BUILD_TIME}" \
+      -o /out/kv-cache .
 
-# Build the binary statically with extreme optimizations
-# - CGO_ENABLED=0: Statically links the binary
-# - trimpath: Removes absolute file system paths from the compiled executable
-# - ldflags="-s -w": Strips debugging information and symbol tables to reduce size
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o kv-cache .
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 
-# final production image
-# Use 'scratch', an empty image, for the smallest possible footprint
-FROM scratch
+ARG VERSION=dev
+ARG COMMIT=unknown
+LABEL org.opencontainers.image.source="https://github.com/venki1402/kv-cache" \
+      org.opencontainers.image.revision="${COMMIT}" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.title="kv-cache" \
+      org.opencontainers.image.licenses="MIT"
 
-# Copy the user/group information from the builder stage
-COPY --from=builder /etc/passwd /etc/passwd
+COPY --from=builder /out/kv-cache /kv-cache
 
-# Copy the statically compiled binary
-COPY --from=builder /app/kv-cache /kv-cache
-
-# Tell Docker to run the container as the unprivileged user
-USER cacheuser
-
-# Expose the application port
-EXPOSE 7171
-
-# Use ENTRYPOINT instead of CMD for pure executables
+USER 65532:65532
+EXPOSE 7171 9091
 ENTRYPOINT ["/kv-cache"]

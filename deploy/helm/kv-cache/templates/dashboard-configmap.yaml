@@ -1,0 +1,13 @@
+{{- if .Values.dashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kv-cache.fullname" . }}-dashboard
+  labels:
+    {{- include "kv-cache.labels" . | nindent 4 }}
+    # Picked up by the Grafana dashboard sidecar.
+    grafana_dashboard: "1"
+data:
+  kv-cache.json: |-
+    {{- .Files.Get "dashboards/kv-cache.json" | nindent 4 }}
+{{- end }}

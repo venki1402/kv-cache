@@ -1,0 +1,6 @@
+apiVersion: v2
+name: kv-cache
+description: Sharded in-memory LRU key-value cache
+type: application
+version: 0.1.0
+appVersion: "1.1.0"

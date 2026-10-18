@@ -1,0 +1,37 @@
+# captured 2026-10-18T16:44:12Z
+$ argocd app get kv-cache --grpc-web
+Name:               argocd/kv-cache
+Project:            default
+Server:             https://kubernetes.default.svc
+Namespace:          kv-cache
+URL:                http://argocd.localhost:8080/applications/kv-cache
+Source:
+- Repo:             https://github.com/venki1402/kv-cache.git
+  Target:           devops
+  Path:             deploy/helm/kv-cache
+  Helm Values:      values-local.yaml
+SyncWindow:         Sync Allowed
+Sync Policy:        Automated (Prune)
+Sync Status:        Synced to devops (fa0d8bf)
+Health Status:      Healthy
+
+GROUP                  KIND            NAMESPACE  NAME                  STATUS  HEALTH   HOOK  MESSAGE
+networking.k8s.io      NetworkPolicy   kv-cache   default-deny-ingress  Synced                 networkpolicy.networking.k8s.io/default-deny-ingress unchanged
+networking.k8s.io      NetworkPolicy   kv-cache   kv-cache              Synced                 networkpolicy.networking.k8s.io/kv-cache configured
+                       ServiceAccount  kv-cache   kv-cache              Synced                 serviceaccount/kv-cache unchanged
+                       ConfigMap       kv-cache   kv-cache              Synced                 configmap/kv-cache configured
+                       ConfigMap       kv-cache   kv-cache-dashboard    Synced                 configmap/kv-cache-dashboard unchanged
+                       Service         kv-cache   kv-cache              Synced  Healthy        service/kv-cache unchanged
+apps                   Deployment      kv-cache   kv-cache              Synced  Healthy        deployment.apps/kv-cache configured
+networking.k8s.io      Ingress         kv-cache   kv-cache              Synced  Healthy        ingress.networking.k8s.io/kv-cache unchanged
+monitoring.coreos.com  ServiceMonitor  kv-cache   kv-cache              Synced                 servicemonitor.monitoring.coreos.com/kv-cache unchanged
+monitoring.coreos.com  PrometheusRule  kv-cache   kv-cache              Synced                 prometheusrule.monitoring.coreos.com/kv-cache unchanged
+
+$ argocd app history kv-cache --grpc-web
+SOURCE  https://github.com/venki1402/kv-cache.git
+ID      DATE                           REVISION
+0       2026-10-18 21:45:38 +0530 IST  devops (d46f54d)
+1       2026-10-18 22:00:26 +0530 IST  devops (a963826)
+2       2026-10-18 22:04:46 +0530 IST  devops (67faf39)
+3       2026-10-18 22:07:12 +0530 IST  devops (fa0d8bf)
+

@@ -1,0 +1,59 @@
+global:
+  domain: argocd.localhost
+
+configs:
+  cm:
+    url: http://argocd.localhost:8080
+  params:
+    # TLS is not terminated anywhere; Traefik serves plain HTTP.
+    server.insecure: true
+
+dex:
+  enabled: false
+notifications:
+  enabled: false
+# The chart has no switch for the ApplicationSet controller; scale it to 0.
+applicationSet:
+  replicas: 0
+
+redis:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+
+controller:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 768Mi
+
+repoServer:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 96Mi
+    limits:
+      memory: 384Mi
+
+server:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    hostname: argocd.localhost
+    path: /
+    pathType: Prefix
+    tls: false

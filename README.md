@@ -1,7 +1,7 @@
 # ultra fast sharded key value lru cache
 
-![Go Version](https://img.shields.io/badge/Go-1.24-blue.svg)
-![Coverage](https://img.shields.io/badge/Coverage-77.5%25-brightgreen.svg)
+![Go Version](https://img.shields.io/badge/Go-1.26-blue.svg)
+![Coverage](https://img.shields.io/badge/Coverage-92%25-brightgreen.svg)
 ![Build](https://img.shields.io/badge/Build-Passing-brightgreen.svg)
 
 a high throughput, memory-bounded, sharded LRU key-value cache written in Go. uses bitwise request routing across 32 shards to minimize lock contention and deterministic O(1) eviction to maintain a strict memory limit, sustaining **172K+ requests/sec** at **~2.15 ms median (p50)** latency.
@@ -82,7 +82,7 @@ benchmarked using `wrk` and a `Lua` randomization script to simulate 400 concurr
 
 > prerequisites
 
-Go 1.21 or higher
+Go 1.26 or higher
 
 > clone the repository
 
@@ -100,7 +100,7 @@ go mod tidy
 > run the server
 
 ```bash
-go run main.go
+go run .
 ```
 
 **The server will start on localhost:7171**
@@ -151,13 +151,128 @@ Response:
 
 ## testing
 
-The project maintains 77.5% test coverage, specifically targeting core sharding logic, hash collisions, O(1) memory eviction constraints, and HTTP edge cases.
+The project maintains 92% test coverage (77.5% at baseline), specifically targeting core sharding logic, hash collisions, O(1) memory eviction constraints, and HTTP edge cases.
 
 > To run the test suite:
 
 ```Bash
 go test -v -cover
 ```
+
+## run on kubernetes
+
+The cache runs on a local [kind](https://kind.sigs.k8s.io/) cluster, deployed by Argo CD from this repo, with Prometheus, Grafana, Alertmanager, Loki and Jaeger around it. GitHub Actions tests every commit, builds a multi-arch image to GHCR and, after a manual approval, bumps the image tag that Argo CD deploys.
+
+### prerequisites
+
+Tested on macOS arm64 with Docker Desktop (8 GB memory for the VM).
+
+| Tool | Version |
+|---|---|
+| Docker Desktop | 8 GB VM |
+| kind | v0.33.0 (node image kindest/node v1.37.0) |
+| kubectl | any recent client |
+| helm | v4.3.1 |
+| argocd CLI | v3.x (only for `make evidence`) |
+| jq, yq, hey, curl | any recent |
+
+Chart versions for the platform are pinned in [`deploy/platform/versions.env`](deploy/platform/versions.env).
+
+### bring it up
+
+```bash
+make up        # kind cluster, platform, namespace + secret, Argo CD Application
+make urls      # print UI addresses and how to read their credentials
+```
+
+`make up` runs `cluster-up`, `platform-up`, `secrets` and `argo-app`. Argo CD then pulls `deploy/helm/kv-cache` from the `devops` branch and deploys the image tag in `values-local.yaml`.
+
+### get the token
+
+`make secrets` puts a random token into the `kv-cache-auth` Secret. It is never written to the repo.
+
+```bash
+TOKEN=$(kubectl -n kv-cache get secret kv-cache-auth -o jsonpath='{.data.token}' | base64 -d)
+```
+
+### access
+
+Everything goes through Traefik on `127.0.0.1:8080`; `*.localhost` resolves to loopback, so no `/etc/hosts` edits are needed.
+
+| What | URL |
+|---|---|
+| App | http://kv.localhost:8080 (`/put`, `/get`, `/version`, `/health`) |
+| Grafana | http://grafana.localhost:8080 (dashboard "kv-cache") |
+| Prometheus | http://prometheus.localhost:8080 |
+| Alertmanager | http://alertmanager.localhost:8080 |
+| Jaeger | http://jaeger.localhost:8080 |
+| Argo CD | http://argocd.localhost:8080 |
+
+If you prefer port-forwards: `kubectl -n monitoring port-forward svc/kps-prometheus 9090` and `kubectl -n kv-cache port-forward svc/kv-cache 7171`.
+
+### smoke test
+
+```bash
+make smoke
+# or by hand
+curl -X POST http://kv.localhost:8080/put -H "Authorization: Bearer $TOKEN" -d '{"key":"king","value":"venki"}'
+curl "http://kv.localhost:8080/get?key=king"
+curl -i http://kv.localhost:8080/version
+```
+
+Other targets: `make load` (hey through the ingress), `make fault-demo`, `make drift-demo`, `make evidence`, `make dev-deploy` (build locally and `kind load` for fast iteration).
+
+### teardown
+
+```bash
+make down
+```
+
+### known limitations
+
+- One replica by design: a restart, eviction or node drain empties the cache and causes a short outage. See [DECISIONS](docs/DECISIONS.md).
+- Prometheus, Loki and Jaeger keep data for hours, in memory or on the kind node; nothing survives `make down`.
+- Everything is plain HTTP on loopback. `values-prod.yaml` shows the TLS setup but is never deployed.
+- The Secret is created by hand (`make secrets`); production would use External Secrets or Sealed Secrets.
+
+## what changed from the baseline
+
+Baseline is commit [`8c563c0`](https://github.com/venki1402/kv-cache/tree/8c563c08056dc1e9a69196ef5bab6fd3bdacde23) (tag `baseline`).
+
+| Area | Baseline | Now |
+|---|---|---|
+| Packaging | `scratch` image, amd64 only, Docker Hub | Distroless nonroot, amd64 + arm64 cross-compiled, GHCR tagged by git SHA, SBOM and provenance |
+| Runtime | `docker run` | kind cluster, Helm chart, Traefik ingress |
+| Config | Hard-coded constants | Env vars with the same defaults; 128 MiB cap set only in Helm values |
+| CI | None | GitHub Actions: vet, golangci-lint, race tests + coverage, govulncheck, gitleaks, helm lint, kubeconform, trivy config and image |
+| CD and release | Manual | Argo CD GitOps; release job behind a manual approval bumps the image tag |
+| Health | `/health` | `/health` kept, plus `/healthz` liveness, `/readyz` readiness and `/version` |
+| Metrics | None | Prometheus metrics on port 9091, ServiceMonitor, SLO burn-rate alerts, Grafana dashboard |
+| Logs | `log.Printf` | JSON (`log/slog`) with version, commit and trace_id, collected by Alloy into Loki |
+| Tracing | None | OpenTelemetry to Jaeger, off by default, on locally |
+| Security | Non-root user | Restricted Pod Security, read-only root fs, dropped capabilities, NetworkPolicy, optional bearer auth on writes, pinned actions, no long-lived credentials |
+
+## release flow
+
+1. Push to `devops` (or `main`). CI runs checks, builds and pushes `ghcr.io/venki1402/kv-cache:<sha>`, then installs that exact image on a throwaway kind cluster and runs the smoke test.
+2. The `release` job waits for approval in the `production` environment.
+3. On approval it commits `chore(release): deploy <short-sha> [skip ci]`, which sets `image.tag` in `values-local.yaml`.
+4. Argo CD syncs the change. `/version` and `kvcache_build_info` report the new commit.
+
+The release commit is a bot commit. It deploys the commit named in its message, the one its CI run built and tested. That is usually its parent, but not always: if other commits land while the release waits for approval, they sit in between (e.g. 4cfd5e1 deploys 240ba9d, while its parent is fa0d8bf).
+
+## rollback
+
+`git revert` the release (or values) commit and push. Argo CD syncs the previous tag. Don't `kubectl edit` the Deployment: selfHeal reverts manual changes. [`docs/FAULT-DEMO.md`](docs/FAULT-DEMO.md) shows a full bad-release-and-revert run.
+
+## docs
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Decisions](docs/DECISIONS.md)
+- [Runbook](docs/RUNBOOK.md)
+- [Fault demo](docs/FAULT-DEMO.md)
+- [Evidence](docs/EVIDENCE.md)
+- [Submission](docs/SUBMISSION.md)
 
 ## License
 

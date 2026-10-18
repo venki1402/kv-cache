@@ -1,0 +1,9 @@
+[extend]
+useDefault = true
+
+[allowlist]
+# The smoke test writes cache keys named smoke-<unix time>-<random>. They are
+# test data in captured evidence, but their entropy trips generic-api-key.
+description = "Smoke-test cache keys in evidence output"
+regexTarget = "line"
+regexes = ['''"key":"smoke-\d+-\d+"''']

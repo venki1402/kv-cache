@@ -11,7 +11,9 @@ import (
 func TestShardedCache_PutAndGet(t *testing.T) {
 	sc := NewShardedCache(4, 1024*1024)
 
-	sc.Put("key1", "value1")
+	if err := sc.Put("key1", "value1"); err != nil {
+		t.Fatal(err)
+	}
 	val, ok := sc.Get("key1")
 
 	if !ok {
@@ -25,8 +27,11 @@ func TestShardedCache_PutAndGet(t *testing.T) {
 func TestShardedCache_Update(t *testing.T) {
 	sc := NewShardedCache(4, 1024*1024)
 
-	sc.Put("key1", "value1")
-	sc.Put("key1", "value2")
+	for _, v := range []string{"value1", "value2"} {
+		if err := sc.Put("key1", v); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	val, ok := sc.Get("key1")
 	if !ok {
@@ -54,9 +59,11 @@ func TestDjb2Hash(t *testing.T) {
 func TestShardedCache_LRUEviction(t *testing.T) {
 	sc := NewShardedCache(1, 200)
 
-	sc.Put("k1", "v1")
-	sc.Put("k2", "v2")
-	sc.Put("k3", "v3")
+	for _, k := range []string{"k1", "k2", "k3"} {
+		if err := sc.Put(k, "v"+k[1:]); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	if _, ok := sc.Get("k1"); ok {
 		t.Fatal("expected k1 to be evicted due to memory limits")
@@ -94,7 +101,9 @@ func TestRequestHandler_Put(t *testing.T) {
 
 func TestRequestHandler_Get(t *testing.T) {
 	cache = NewShardedCache(4, 1024*1024)
-	cache.Put("testkey", "testvalue")
+	if err := cache.Put("testkey", "testvalue"); err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := &fasthttp.RequestCtx{}
 	ctx.Request.Header.SetMethod("GET")

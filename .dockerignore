@@ -1,9 +1,6 @@
-# git
-.git
-.gitignore
-
-# binary
-main
-
-# docs
-README.md
+# Allow-list: only what the build needs reaches the context.
+*
+!go.mod
+!go.sum
+!*.go
+*_test.go
