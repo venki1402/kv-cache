@@ -230,12 +230,11 @@ func main() {
 	cache = NewShardedCache(NumShards, MaxMemoryBytes)
 
 	s := &fasthttp.Server{
-		Handler:              requestHandler,
-		Name:                 "kv-cache",
-		ReadTimeout:          5 * time.Second,
-		WriteTimeout:         5 * time.Second,
-		MaxConnsPerIP:        0,
-		MaxKeepaliveDuration: 60 * time.Second,
+		Handler:       requestHandler,
+		Name:          "kv-cache",
+		ReadTimeout:   5 * time.Second,
+		WriteTimeout:  5 * time.Second,
+		MaxConnsPerIP: 0,
 	}
 
 	log.Printf("Starting kv-cache server on :7171")
