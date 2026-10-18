@@ -1,0 +1,39 @@
+# captured 2026-10-18T16:31:17Z: source commit -> CI run -> image -> release commit -> Argo revision -> pod -> /version -> build_info
+## 1. source commit
+326a537352014ec8451531b0544d42b1ca949a2c venki1402 fix(ci): retrigger ci and fail the release step if its push fails
+## 2. CI run
+{"event":"push","headSha":"326a537352014ec8451531b0544d42b1ca949a2c","jobs":[{"conclusion":"success","name":"checks"},{"conclusion":"success","name":"build"},{"conclusion":"success","name":"e2e"},{"conclusion":"success","name":"release"}],"url":"https://github.com/venki1402/kv-cache/actions/runs/39144658231"}
+## approval of the production environment
+{"environments":["production"],"state":"approved","user":"venki1402"}
+## 3. image and its OCI labels per platform
+linux/amd64: {
+  "org.opencontainers.image.licenses": "MIT",
+  "org.opencontainers.image.revision": "326a537352014ec8451531b0544d42b1ca949a2c",
+  "org.opencontainers.image.source": "https://github.com/venki1402/kv-cache",
+  "org.opencontainers.image.title": "kv-cache",
+  "org.opencontainers.image.version": "baseline-13-g326a537"
+}
+linux/arm64: {
+  "org.opencontainers.image.licenses": "MIT",
+  "org.opencontainers.image.revision": "326a537352014ec8451531b0544d42b1ca949a2c",
+  "org.opencontainers.image.source": "https://github.com/venki1402/kv-cache",
+  "org.opencontainers.image.title": "kv-cache",
+  "org.opencontainers.image.version": "baseline-13-g326a537"
+}
+Name:      ghcr.io/venki1402/kv-cache:326a537352014ec8451531b0544d42b1ca949a2c
+MediaType: application/vnd.oci.image.index.v1+json
+Digest:    sha256:41e4c8e1aaebbc942f23fb4d6436709bb5f535b22a23eeeea646c9466c047c2e
+           
+## 4. release commit
+a963826f2acd2b12e933735fe5cdd607c4117675 github-actions[bot] chore(release): deploy 326a537 [skip ci]
+-  tag: "9cb6b3121ddbfc51bbda31cf73179b4f4010fa67"
++  tag: "326a537352014ec8451531b0544d42b1ca949a2c"
+## 5. Argo CD synced revision
+sync=Synced health=Healthy revision=a963826f2acd2b12e933735fe5cdd607c4117675
+## 6. pod image
+kv-cache-5dbdf86874-g2rpv ghcr.io/venki1402/kv-cache:326a537352014ec8451531b0544d42b1ca949a2c ghcr.io/venki1402/kv-cache@sha256:41e4c8e1aaebbc942f23fb4d6436709bb5f535b22a23eeeea646c9466c047c2e
+## 7. /version through the ingress
+X-App-Version: baseline-13-g326a537
+{"buildTime":"2026-10-18T21:51:45+05:30","commit":"326a537352014ec8451531b0544d42b1ca949a2c","version":"baseline-13-g326a537"}
+## 8. kvcache_build_info in Prometheus
+{"commit":"326a537352014ec8451531b0544d42b1ca949a2c","version":"baseline-13-g326a537","pod":"kv-cache-5dbdf86874-g2rpv"}

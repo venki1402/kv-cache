@@ -1,0 +1,23 @@
+# captured 2026-10-18T16:32:16Z against the released pod (image 326a537): metrics -> rules -> traces -> logs -> log-to-trace link
+## Prometheus scrape target for kv-cache
+{"job":"kv-cache","scrapeUrl":"http://10.244.0.11:9091/metrics","health":"up","lastError":""}
+## kv-cache rule groups loaded
+{"name":"kv-cache.kubernetes","rules":6,"health":["ok"]}
+{"name":"kv-cache.recording","rules":9,"health":["ok"]}
+{"name":"kv-cache.slo","rules":3,"health":["ok"]}
+## kvcache_build_info
+{"commit":"326a537352014ec8451531b0544d42b1ca949a2c","version":"baseline-13-g326a537","pod":"kv-cache-5dbdf86874-g2rpv"}
+## cache hit ratio (5m) after 30 GETs of an existing key (queried after the next rule evaluation)
+{"metric":"kvcache:cache_hit_ratio:rate5m","value":"1"}
+## request sent with traceparent 00-326a5370000000000000000000000001-1111222233334444-01 (PUT /put through the ingress)
+## Jaeger: services and spans of that trace
+{"services":["jaeger","kv-cache"]}
+{"service":{"service.name":"kv-cache","service.version":"baseline-13-g326a537","vcs.revision":"326a537352014ec8451531b0544d42b1ca949a2c"},"spans":[{"name":"cache.put","spanId":"e4173561c1d8b2d0","parentSpanId":"7f759aec82f7ff84","attributes":{"cache.shard":"6"}},{"name":"POST put","spanId":"7f759aec82f7ff84","parentSpanId":"1111222233334444","attributes":{"http.request.method":"POST","http.response.status_code":"200","http.route":"put","@jaeger@warnings":null}}]}
+## app log line for the same request (kubectl logs)
+{"time":"2026-10-18T16:31:50.823088252Z","level":"DEBUG","msg":"request","version":"baseline-13-g326a537","commit":"326a537352014ec8451531b0544d42b1ca949a2c","route":"put","method":"POST","status":200,"duration_ms":0.42,"trace_id":"326a5370000000000000000000000001"}
+## the same line in Loki, through Grafana (query {namespace="kv-cache"} |= "326a5370000000000000000000000001")
+{"labels":{"namespace":"kv-cache","pod":"kv-cache-5dbdf86874-g2rpv","container":"kv-cache","app":"kv-cache"},"line":"{\"time\":\"2026-10-18T16:31:50.823088252Z\",\"level\":\"DEBUG\",\"msg\":\"request\",\"version\":\"baseline-13-g326a537\",\"commit\":\"326a537352014ec8451531b0544d42b1ca949a2c\",\"route\":\"put\",\"method\":\"POST\",\"status\":200,\"duration_ms\":0.42,\"trace_id\":\"326a5370000000000000000000000001\"}\n"}
+## Grafana Loki derived field (log line -> Jaeger trace link)
+[{"datasourceUid":"jaeger","matcherRegex":"\"trace_id\":\"(\\w+)\"","name":"TraceID","url":"${__value.raw}","urlDisplayLabel":"View trace"}]
+## Grafana dashboards provisioned by the chart
+[{"title":"kv-cache","uid":"kv-cache","url":"/d/kv-cache/kv-cache"}]
