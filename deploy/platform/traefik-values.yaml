@@ -1,0 +1,53 @@
+# kind maps host 127.0.0.1:8080 -> control-plane :30080 (NodePort below).
+
+deployment:
+  replicas: 1
+
+ingressClass:
+  enabled: true
+  isDefaultClass: true
+  name: traefik
+
+providers:
+  kubernetesCRD:
+    enabled: true
+  kubernetesIngress:
+    enabled: true
+    # NodePort has no LB address; report 127.0.0.1 in Ingress status so
+    # Argo CD marks Ingresses Healthy.
+    publishedService:
+      enabled: false
+    ingressEndpoint:
+      ip: 127.0.0.1
+
+api:
+  dashboard: false
+ingressRoute:
+  dashboard:
+    enabled: false
+
+ports:
+  web:
+    nodePort: 30080
+  websecure:
+    expose:
+      default: false
+
+service:
+  spec:
+    type: NodePort
+
+# Prometheus metrics on the "metrics" entrypoint (:9100). Scraped by a
+# PodMonitor defined in kube-prometheus-stack-values.yaml.
+metrics:
+  prometheus:
+    entryPoint: metrics
+    addEntryPointsLabels: true
+    addServicesLabels: true
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi

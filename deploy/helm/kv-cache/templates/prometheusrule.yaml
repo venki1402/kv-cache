@@ -1,0 +1,220 @@
+{{- if .Values.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "kv-cache.fullname" . }}
+  labels:
+    {{- include "kv-cache.labels" . | nindent 4 }}
+spec:
+  groups:
+    # SLI: all requests except kubelet probe routes (healthz, readyz).
+    # Denominators are filtered with "> 0" so idle windows produce no series
+    # instead of NaN.
+    - name: kv-cache.recording
+      interval: 30s
+      rules:
+        - record: kvcache:http_requests:rate5m
+          expr: |
+            sum by (namespace, job, route) (
+              rate(kvcache_http_requests_total{job="kv-cache",namespace="kv-cache"}[5m])
+            )
+
+        - record: kvcache:http_error_ratio:rate5m
+          expr: |
+            (
+              sum by (namespace, job) (rate(kvcache_http_requests_total{job="kv-cache",namespace="kv-cache",route!~"healthz|readyz",code=~"5.."}[5m]))
+              or
+              0 * sum by (namespace, job) (rate(kvcache_http_requests_total{job="kv-cache",namespace="kv-cache",route!~"healthz|readyz"}[5m]))
+            )
+            /
+            (sum by (namespace, job) (rate(kvcache_http_requests_total{job="kv-cache",namespace="kv-cache",route!~"healthz|readyz"}[5m])) > 0)
+
+        - record: kvcache:http_error_ratio:rate30m
+          expr: |
+            (
+              sum by (namespace, job) (rate(kvcache_http_requests_total{job="kv-cache",namespace="kv-cache",route!~"healthz|readyz",code=~"5.."}[30m]))
+              or
+              0 * sum by (namespace, job) (rate(kvcache_http_requests_total{job="kv-cache",namespace="kv-cache",route!~"healthz|readyz"}[30m]))
+            )
+            /
+            (sum by (namespace, job) (rate(kvcache_http_requests_total{job="kv-cache",namespace="kv-cache",route!~"healthz|readyz"}[30m])) > 0)
+
+        - record: kvcache:http_error_ratio:rate1h
+          expr: |
+            (
+              sum by (namespace, job) (rate(kvcache_http_requests_total{job="kv-cache",namespace="kv-cache",route!~"healthz|readyz",code=~"5.."}[1h]))
+              or
+              0 * sum by (namespace, job) (rate(kvcache_http_requests_total{job="kv-cache",namespace="kv-cache",route!~"healthz|readyz"}[1h]))
+            )
+            /
+            (sum by (namespace, job) (rate(kvcache_http_requests_total{job="kv-cache",namespace="kv-cache",route!~"healthz|readyz"}[1h])) > 0)
+
+        - record: kvcache:http_error_ratio:rate6h
+          expr: |
+            (
+              sum by (namespace, job) (rate(kvcache_http_requests_total{job="kv-cache",namespace="kv-cache",route!~"healthz|readyz",code=~"5.."}[6h]))
+              or
+              0 * sum by (namespace, job) (rate(kvcache_http_requests_total{job="kv-cache",namespace="kv-cache",route!~"healthz|readyz"}[6h]))
+            )
+            /
+            (sum by (namespace, job) (rate(kvcache_http_requests_total{job="kv-cache",namespace="kv-cache",route!~"healthz|readyz"}[6h])) > 0)
+
+        - record: kvcache:get_latency_seconds:p50_5m
+          expr: |
+            histogram_quantile(0.50,
+              sum by (namespace, job, le) (rate(kvcache_http_request_duration_seconds_bucket{job="kv-cache",namespace="kv-cache",route="get"}[5m]))
+            )
+
+        - record: kvcache:get_latency_seconds:p95_5m
+          expr: |
+            histogram_quantile(0.95,
+              sum by (namespace, job, le) (rate(kvcache_http_request_duration_seconds_bucket{job="kv-cache",namespace="kv-cache",route="get"}[5m]))
+            )
+
+        - record: kvcache:get_latency_seconds:p99_5m
+          expr: |
+            histogram_quantile(0.99,
+              sum by (namespace, job, le) (rate(kvcache_http_request_duration_seconds_bucket{job="kv-cache",namespace="kv-cache",route="get"}[5m]))
+            )
+
+        - record: kvcache:cache_hit_ratio:rate5m
+          expr: |
+            sum by (namespace, job) (rate(kvcache_cache_hits_total{job="kv-cache",namespace="kv-cache"}[5m]))
+            /
+            (
+              (
+                sum by (namespace, job) (rate(kvcache_cache_hits_total{job="kv-cache",namespace="kv-cache"}[5m]))
+                +
+                sum by (namespace, job) (rate(kvcache_cache_misses_total{job="kv-cache",namespace="kv-cache"}[5m]))
+              ) > 0
+            )
+
+    - name: kv-cache.slo
+      rules:
+        # 99.5% SLO, error budget 0.005. Page at 14.4x burn (2% of budget in 1h).
+        - alert: KvCacheHighErrorRatioFastBurn
+          expr: |
+            kvcache:http_error_ratio:rate1h > (14.4 * 0.005)
+            and
+            kvcache:http_error_ratio:rate5m > (14.4 * 0.005)
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: kv-cache is burning its error budget fast (14.4x)
+            description: 5xx ratio over 1h is {{`{{ $value | humanizePercentage }}`}} (threshold 7.2%). At this rate the 30-day budget is gone in about 2 days.
+            runbook_url: https://github.com/venki1402/kv-cache/blob/devops/docs/RUNBOOK.md#kvcachehigherrorratiofastburn
+
+        # Ticket at 6x burn (5% of budget in 6h).
+        - alert: KvCacheHighErrorRatioSlowBurn
+          expr: |
+            kvcache:http_error_ratio:rate6h > (6 * 0.005)
+            and
+            kvcache:http_error_ratio:rate30m > (6 * 0.005)
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: kv-cache is burning its error budget (6x)
+            description: 5xx ratio over 6h is {{`{{ $value | humanizePercentage }}`}} (threshold 3%). At this rate the 30-day budget is gone in about 5 days.
+            runbook_url: https://github.com/venki1402/kv-cache/blob/devops/docs/RUNBOOK.md#kvcachehigherrorratioslowburn
+
+        - alert: KvCacheGetLatencyHigh
+          expr: |
+            kvcache:get_latency_seconds:p99_5m > 0.05
+            and on (namespace, job)
+            sum by (namespace, job) (kvcache:http_requests:rate5m{route="get"}) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: kv-cache GET p99 latency above 50ms
+            description: p99 latency for route get is {{`{{ $value | humanizeDuration }}`}} over the last 5m (SLO 50ms).
+            runbook_url: https://github.com/venki1402/kv-cache/blob/devops/docs/RUNBOOK.md#kvcachegetlatencyhigh
+
+    - name: kv-cache.kubernetes
+      rules:
+        - alert: KvCachePodNotReady
+          expr: |
+            max by (namespace, pod) (
+              kube_pod_status_ready{namespace="kv-cache",condition="true",pod=~"kv-cache-.*"}
+            ) == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: kv-cache pod {{`{{ $labels.pod }}`}} is not ready
+            description: Pod {{`{{ $labels.namespace }}`}}/{{`{{ $labels.pod }}`}} has not been Ready for more than 2 minutes.
+            runbook_url: https://github.com/venki1402/kv-cache/blob/devops/docs/RUNBOOK.md#kvcachepodnotready
+
+        - alert: KvCacheRolloutStuck
+          expr: |
+            (
+              max by (namespace, deployment) (kube_deployment_status_replicas_unavailable{namespace="kv-cache",deployment="kv-cache"}) > 0
+            )
+            or
+            (
+              max by (namespace, deployment) (kube_deployment_spec_replicas{namespace="kv-cache",deployment="kv-cache"})
+              !=
+              max by (namespace, deployment) (kube_deployment_status_replicas_updated{namespace="kv-cache",deployment="kv-cache"})
+            )
+          for: 3m
+          labels:
+            severity: warning
+          annotations:
+            summary: kv-cache rollout is not progressing
+            description: Deployment {{`{{ $labels.namespace }}`}}/{{`{{ $labels.deployment }}`}} has unavailable or not-updated replicas for more than 3 minutes.
+            runbook_url: https://github.com/venki1402/kv-cache/blob/devops/docs/RUNBOOK.md#kvcacherolloutstuck
+
+        # Any restart wipes the in-memory cache, so a single one is worth a look.
+        - alert: KvCachePodRestarting
+          expr: |
+            max by (namespace, pod, container) (
+              increase(kube_pod_container_status_restarts_total{namespace="kv-cache",container="kv-cache"}[15m])
+            ) > 0
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: kv-cache container in {{`{{ $labels.pod }}`}} is restarting
+            description: Container {{`{{ $labels.container }}`}} in {{`{{ $labels.pod }}`}} restarted about {{`{{ $value | printf "%.0f" }}`}} time(s) in the last 15 minutes. Cached keys on that pod were lost.
+            runbook_url: https://github.com/venki1402/kv-cache/blob/devops/docs/RUNBOOK.md#kvcachepodrestarting
+
+        - alert: KvCacheMemoryHigh
+          expr: |
+            max by (namespace, pod) (container_memory_working_set_bytes{namespace="kv-cache",container="kv-cache"})
+            /
+            max by (namespace, pod) (kube_pod_container_resource_limits{namespace="kv-cache",container="kv-cache",resource="memory"})
+            > 0.9
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: kv-cache pod {{`{{ $labels.pod }}`}} is near its memory limit
+            description: Working set is {{`{{ $value | humanizePercentage }}`}} of the container memory limit. The pod may be OOMKilled.
+            runbook_url: https://github.com/venki1402/kv-cache/blob/devops/docs/RUNBOOK.md#kvcachememoryhigh
+
+        - alert: KvCacheTargetDown
+          expr: |
+            up{job="kv-cache",namespace="kv-cache"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            reason: scrape_failed
+          annotations:
+            summary: Prometheus cannot scrape kv-cache target {{`{{ $labels.instance }}`}}
+            description: Scrape of {{`{{ $labels.pod }}`}} ({{`{{ $labels.instance }}`}}) has failed for more than 2 minutes.
+            runbook_url: https://github.com/venki1402/kv-cache/blob/devops/docs/RUNBOOK.md#kvcachetargetdown
+
+        - alert: KvCacheTargetDown
+          expr: |
+            absent(up{job="kv-cache",namespace="kv-cache"})
+          for: 5m
+          labels:
+            severity: critical
+            reason: no_targets
+          annotations:
+            summary: No kv-cache scrape targets found
+            description: Prometheus has no kv-cache targets for 5 minutes. The Deployment, Service or ServiceMonitor may be missing.
+            runbook_url: https://github.com/venki1402/kv-cache/blob/devops/docs/RUNBOOK.md#kvcachetargetdown
+{{- end }}

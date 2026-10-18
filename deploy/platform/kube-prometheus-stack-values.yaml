@@ -1,0 +1,217 @@
+fullnameOverride: kps
+
+# Components that do not work on kind (or are unused) and their rules.
+kubeEtcd:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeProxy:
+  enabled: false
+windowsMonitoring:
+  enabled: false
+
+defaultRules:
+  create: true
+  rules:
+    etcd: false
+    kubeControllerManager: false
+    kubeProxy: false
+    kubeSchedulerAlerting: false
+    kubeSchedulerRecording: false
+    windows: false
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+prometheus:
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    hosts:
+      - prometheus.localhost
+    paths:
+      - /
+    pathType: Prefix
+
+  prometheusSpec:
+    externalUrl: http://prometheus.localhost:8080
+    retention: 6h
+    replicas: 1
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+    # Pick up monitors and rules from any namespace, no release label needed.
+    ruleSelectorNilUsesHelmValues: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+    scrapeConfigSelectorNilUsesHelmValues: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 384Mi
+      limits:
+        memory: 1Gi
+
+  additionalPodMonitors:
+    - name: traefik
+      selector:
+        matchLabels:
+          app.kubernetes.io/name: traefik
+      namespaceSelector:
+        matchNames:
+          - traefik
+      podMetricsEndpoints:
+        - port: metrics
+          path: /metrics
+
+  additionalServiceMonitors:
+    - name: jaeger
+      selector:
+        matchLabels:
+          app.kubernetes.io/name: jaeger
+          app.kubernetes.io/instance: jaeger
+      namespaceSelector:
+        matchNames:
+          - observability
+      endpoints:
+        - port: internal-metrics
+          path: /metrics
+
+alertmanager:
+  enabled: true
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    hosts:
+      - alertmanager.localhost
+    paths:
+      - /
+    pathType: Prefix
+  alertmanagerSpec:
+    externalUrl: http://alertmanager.localhost:8080
+    replicas: 1
+    retention: 24h
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 128Mi
+
+kubeStateMetrics:
+  enabled: true
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+
+nodeExporter:
+  enabled: true
+  operatingSystems:
+    linux:
+      enabled: true
+    aix:
+      enabled: false
+    darwin:
+      enabled: false
+prometheus-node-exporter:
+  # The rootfs mount fails on Docker Desktop (/ is not a shared mount).
+  hostRootFsMount:
+    enabled: false
+  resources:
+    requests:
+      cpu: 10m
+      memory: 16Mi
+    limits:
+      memory: 64Mi
+
+grafana:
+  enabled: true
+  testFramework:
+    enabled: false
+
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    hosts:
+      - grafana.localhost
+    path: /
+
+  grafana.ini:
+    server:
+      root_url: http://grafana.localhost:8080
+    analytics:
+      check_for_updates: false
+      reporting_enabled: false
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 384Mi
+
+  sidecar:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 128Mi
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: ALL
+    datasources:
+      enabled: true
+      defaultDatasourceEnabled: true
+      isDefaultDatasource: true
+      name: Prometheus
+      uid: prometheus
+
+  # "$$" is needed so Grafana provisioning does not expand "${__value.raw}"
+  # as an environment variable.
+  additionalDataSources:
+    - name: Jaeger
+      uid: jaeger
+      type: jaeger
+      access: proxy
+      url: http://jaeger.observability.svc.cluster.local:16686
+      editable: false
+      jsonData:
+        tracesToLogsV2:
+          datasourceUid: loki
+          spanStartTimeShift: "-5m"
+          spanEndTimeShift: "5m"
+          customQuery: true
+          query: '{namespace=~".+"} |= "$${__trace.traceId}"'
+    - name: Loki
+      uid: loki
+      type: loki
+      access: proxy
+      url: http://loki.monitoring.svc.cluster.local:3100
+      editable: false
+      jsonData:
+        maxLines: 1000
+        derivedFields:
+          - name: TraceID
+            matcherRegex: '"trace_id":"(\w+)"'
+            datasourceUid: jaeger
+            url: "$${__value.raw}"
+            urlDisplayLabel: View trace
