@@ -1,6 +1,6 @@
 # kind cluster managed by Argo CD. image.tag is bumped by the release job.
 image:
-  tag: "9cb6b3121ddbfc51bbda31cf73179b4f4010fa67"
+  tag: "326a537352014ec8451531b0544d42b1ca949a2c"
 config:
   # Debug adds one log line per request carrying trace_id, used for the
   # log-to-trace link in Grafana.
