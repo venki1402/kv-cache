@@ -93,9 +93,12 @@ The short window makes the alert resolve quickly once errors stop.
    kubectl -n kv-cache get deploy,rs,pods -o wide
    kubectl -n kv-cache describe deploy kv-cache
    kubectl -n kv-cache get events --sort-by=.lastTimestamp | tail -20
-   argocd app get kv-cache
-   argocd app history kv-cache
+   argocd app get kv-cache --grpc-web
+   argocd app history kv-cache --grpc-web
    ```
+
+   The `argocd` CLI reaches the server through Traefik over plain HTTP:
+   `argocd login argocd.localhost:8080 --plaintext --insecure --grpc-web --username admin`.
 
 3. Logs:
 

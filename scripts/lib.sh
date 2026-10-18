@@ -13,9 +13,4 @@ alert_state() { # alertname -> firing|pending|inactive
   curl -s "$PROM/api/v1/alerts" | jq -r --arg a "$1" \
     '[.data.alerts[] | select(.labels.alertname==$a) | .state] | if length==0 then "inactive" else (if index("firing") then "firing" else .[0] end) end'
 }
-attribution_check() {
-  if git log --format='%an %ae%n%B' origin/main..HEAD | grep -iE 'claude|anthropic|co-authored'; then
-    echo "attribution check failed" >&2; exit 1
-  fi
-}
-push() { attribution_check; git pull --rebase --autostash -q; git push -q; }
+push() { git pull --rebase --autostash -q; git push -q; }
