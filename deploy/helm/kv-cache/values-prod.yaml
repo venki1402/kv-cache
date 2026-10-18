@@ -1,0 +1,34 @@
+# Reference only, never deployed: shows how production would differ from
+# local using values alone.
+image:
+  tag: "0000000000000000000000000000000000000000"
+
+config:
+  maxMemoryBytes: "1073741824"
+  otel:
+    enabled: true
+    endpoint: http://otel-collector.observability.svc.cluster.local:4317
+    # 10% head sampling keeps tracing cost bounded at production traffic.
+    samplerArg: "0.1"
+
+auth:
+  # Synced from a secret manager by External Secrets Operator.
+  existingSecret: kv-cache-auth-external
+
+ingress:
+  className: traefik
+  host: kv.example.com
+  tls:
+    - secretName: kv-example-com-tls
+      hosts: [kv.example.com]
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1280Mi
+  limits:
+    memory: 1536Mi
+
+# Alert routing: production Alertmanager would page on severity=critical
+# and open tickets for severity=warning, instead of the local default
+# receiver.

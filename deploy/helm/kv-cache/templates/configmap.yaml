@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kv-cache.fullname" . }}
+  labels:
+    {{- include "kv-cache.labels" . | nindent 4 }}
+data:
+  PORT: {{ .Values.service.port | quote }}
+  METRICS_PORT: {{ .Values.service.metricsPort | quote }}
+  MAX_MEMORY_BYTES: {{ .Values.config.maxMemoryBytes | quote }}
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  SHUTDOWN_DELAY: {{ .Values.config.shutdownDelay | quote }}
+  FAIL_READINESS: {{ .Values.config.failReadiness | quote }}
+  OTEL_ENABLED: {{ .Values.config.otel.enabled | quote }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.config.otel.endpoint | quote }}
+  OTEL_TRACES_SAMPLER_ARG: {{ .Values.config.otel.samplerArg | quote }}
