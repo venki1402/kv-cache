@@ -5,7 +5,7 @@ INGRESS   ?= http://kv.localhost:8080
 IMAGE     ?= ghcr.io/venki1402/kv-cache
 SHA       := $(shell git rev-parse HEAD)
 
-.PHONY: up cluster-up platform-up secrets argo-app dev-deploy smoke load fault-demo drift-demo evidence urls down test lint chart-check bench
+.PHONY: up cluster-up platform-up secrets argo-app dev-deploy smoke load fault-demo drift-demo evidence urls down test lint chart-check
 
 up: cluster-up platform-up secrets argo-app urls
 
@@ -76,6 +76,3 @@ chart-check:
 	    kubeconform -strict -summary -schema-location default \
 	      -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' || exit 1; \
 	done
-
-bench:
-	scripts/bench.sh

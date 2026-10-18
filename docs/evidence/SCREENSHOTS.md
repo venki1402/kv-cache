@@ -1,17 +1,26 @@
-# Screenshots checklist
+# Screenshots
 
-Save each screenshot in `docs/evidence/screenshots/` with the file name given below. Before saving, check that no token, password or kubeconfig is visible.
+All screenshots were taken on 2026-10-18 (times are IST) and checked so that no token, password or kubeconfig is visible. They live in [`screenshots/`](screenshots/).
 
-| # | File | What to capture | Where |
+- [x] **1. CI run with approval**: [`01-actions-run-326a537.png`](screenshots/01-actions-run-326a537.png). Run 39144658231 for `326a537`: checks, build, e2e and release all green, coverage 92.2%, "No leaks detected", and the `production` approval by venki1402.
+- [x] **2. Argo CD synced app**: [`02-argocd-synced.png`](screenshots/02-argocd-synced.png). Application `kv-cache` is Healthy and Synced to `devops`, with the full resource tree: ConfigMaps, Service, ServiceAccount, Deployment, PrometheusRule, ServiceMonitor, Ingress and both NetworkPolicies.
+- [x] **3. Grafana dashboard**: [`03-grafana-dashboard.png`](screenshots/03-grafana-dashboard.png). The kv-cache dashboard under load. "Running versions" shows `baseline-15-g240ba9d`, the 1/1 pod is ready, the request-rate spike reaches ~10k req/s, latency stays far below the 50 ms line, and the hit ratio is 100%.
+- [x] **4. Jaeger trace**: [`04-jaeger-trace-get.png`](screenshots/04-jaeger-trace-get.png). 20 `GET get` traces with 2 spans each: the server span plus its `cache.get` child span.
+- [x] **5. Fired alert**: [`05a`](screenshots/05a-alert-inactive-before.png) → [`05b`](screenshots/05b-alert-pending.png) → [`05c`](screenshots/05c-alert-firing.png) → [`05d`](screenshots/05d-alert-resolved.png). `KvCachePodNotReady` through its whole lifecycle; see below.
+- [x] **6. Fault demo in traces (extra)**: [`06-jaeger-readyz-errors-fault-demo.png`](screenshots/06-jaeger-readyz-errors-fault-demo.png). During a fault-demo run, the bad pod's `GET readyz` spans are flagged as errors in Jaeger while `GET version` traffic keeps succeeding on the old pod.
+
+## Alert lifecycle
+
+These were taken during `make fault-demo` re-runs made for the screenshots, after the documented run in [FAULT-DEMO.md](../FAULT-DEMO.md):
+
+- Run A: bad commit `92f8ce5` at 22:59:14, revert `77e852e` at 23:01:34.
+- Run B: bad commit `9a8e044` at 23:08:09, revert `37dc057` at 23:10:33.
+
+The Prometheus alerts page does not auto-refresh, so a screenshot can be saved a little after the state it shows. Each step below gives both the save time and the state shown.
+
+| Step | Screenshot | Saved | State shown |
 |---|---|---|---|
-| 1 | `01-actions-approval.png` | A CI run where `release` waits for, or has passed, the `production` approval. The `checks → build → e2e → release` graph should be visible. | GitHub → Actions → ci → the run for the released commit |
-| 2 | `02-argocd-synced.png` | Application `kv-cache` showing Synced and Healthy, with the revision and the resource tree. | http://argocd.localhost:8080/applications/argocd/kv-cache |
-| 3 | `03-grafana-dashboard.png` | The kv-cache dashboard during or just after `make load`: request rate, latency percentiles, hit ratio and the "Running versions" table showing the deployed commit. | http://grafana.localhost:8080/d/kv-cache |
-| 4 | `04-jaeger-trace.png` | One `kv-cache` trace with the `POST put` server span and its `cache.put` child span. | http://jaeger.localhost:8080, service `kv-cache` |
-| 5 | `05-alert-fired.png` | `KvCachePodNotReady` firing during `make fault-demo`, in Alertmanager or in Prometheus → Alerts. | http://alertmanager.localhost:8080 or http://prometheus.localhost:8080/alerts |
-| 6 (optional) | `06-log-to-trace.png` | Grafana Explore → Loki, query `{namespace="kv-cache"}`, a log line expanded with its "View trace" link. | http://grafana.localhost:8080/explore |
-
-Credentials:
-
-- Grafana: `kubectl -n monitoring get secret grafana-admin -o jsonpath='{.data.admin-password}' | base64 -d` (user `admin`)
-- Argo CD: `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d` (user `admin`)
+| Healthy | [`05a-alert-inactive-before.png`](screenshots/05a-alert-inactive-before.png) | 23:04:40 | All `kv-cache.kubernetes` and `kv-cache.slo` rules loaded and inactive, between runs A and B. Only kube-prometheus-stack's always-on `Watchdog` is firing |
+| Pending | [`05b-alert-pending.png`](screenshots/05b-alert-pending.png) | 23:09:09 | Run B: `KvCachePodNotReady` **pending** for pod `kv-cache-6c6c79bf-848gq`, active 33.75 s into its 2m `for:` window. `KvCacheRolloutStuck` is also pending |
+| Firing | [`05c-alert-firing.png`](screenshots/05c-alert-firing.png) | 23:11:39 | Run B: `KvCachePodNotReady` **firing** (critical) for the same pod, active 2m 12s, so the state is from just before the 23:10:33 revert |
+| Recovered | [`05d-alert-resolved.png`](screenshots/05d-alert-resolved.png) | 23:14:43 | After the revert: all six `kv-cache.kubernetes` rules inactive again |

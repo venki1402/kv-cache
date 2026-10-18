@@ -2,14 +2,14 @@
 
 | Field | Value |
 |---|---|
-| Name | `<NAME>` |
-| Student ID | `<STUDENT_ID>` |
+| Name | `Sai Venkatesh Alampally` |
+| Student ID | `23bcs10095` |
 | Project | kv-cache: DevOps on local Kubernetes |
 | Repository | https://github.com/venki1402/kv-cache |
 | Pull request | https://github.com/venki1402/kv-cache/pull/2 |
 | Baseline commit | `8c563c08056dc1e9a69196ef5bab6fd3bdacde23` (tag `baseline`) |
 | Baseline permalink | https://github.com/venki1402/kv-cache/tree/8c563c08056dc1e9a69196ef5bab6fd3bdacde23 |
-| FINAL_COMMIT | `<fill after last push>` |
+| FINAL_COMMIT | Recorded in the PR description and the submission form (a commit can't contain its own hash). |
 
 ## Description
 

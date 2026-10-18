@@ -16,7 +16,9 @@ Raw outputs are in [`docs/evidence/`](evidence/). Screenshots are listed in [`ev
 
 **Commits after the tested release:**
 
-- The fault-demo pair: `67faf39` (bad values change) and `fa0d8bf` (its revert). Together they leave `values-local.yaml` unchanged.
+- Fault-demo pairs, each a bad values change and its revert, which together leave `values-local.yaml` unchanged:
+  - `67faf39` / `fa0d8bf`: the documented run.
+  - `92f8ce5` / `77e852e` and `9a8e044` / `37dc057`: re-runs made for the screenshots.
 - Docs and evidence: `240ba9d`, `78b5784` and the final docs commit.
 - Release commit `4cfd5e1` deployed image `240ba9d`. Its source differs from `326a537` only in `docs/evidence/` and the `values-local.yaml` tag, so the Go code and Dockerfile are unchanged.
 - Captures up to 16:44 UTC show `326a537` because Argo CD had not yet synced `4cfd5e1`. The cluster now runs the `240ba9d` image, with identical app code.
@@ -24,7 +26,7 @@ Raw outputs are in [`docs/evidence/`](evidence/). Screenshots are listed in [`ev
 
 ## Source to running pod
 
-Raw output: [`evidence/traceability.txt`](evidence/traceability.txt).
+Raw output: [`evidence/traceability.txt`](evidence/traceability.txt). Screenshots: [CI run with approval](evidence/screenshots/01-actions-run-326a537.png) and [Argo CD synced app](evidence/screenshots/02-argocd-synced.png).
 
 | Step | Evidence |
 |---|---|
@@ -75,16 +77,16 @@ Raw output: [`evidence/observability.txt`](evidence/observability.txt), captured
 
 - **Targets up:** the `kv-cache` ServiceMonitor target is `up` with no scrape error. All other active targets are listed in [`evidence/prometheus.txt`](evidence/prometheus.txt).
 - **Rules loaded:** three groups, `kv-cache.recording` (9), `kv-cache.slo` (3) and `kv-cache.kubernetes` (6), all with health `ok`.
-- **Alert fired and resolved:** `KvCachePodNotReady` fired during the fault demo and resolved after the revert. Timings are in the reliability table below and in [FAULT-DEMO.md](FAULT-DEMO.md).
-- **Trace:** a PUT sent through the ingress with a fixed `traceparent` produced a server span `POST put`, whose parent is the caller's span id, and a child span `cache.put` with the shard number. Jaeger lists service `kv-cache` with `service.version` and `vcs.revision` resource attributes.
+- **Alert fired and resolved:** `KvCachePodNotReady` fired during the fault demo and resolved after the revert. Timings are in the reliability table below and in [FAULT-DEMO.md](FAULT-DEMO.md). Screenshots of the lifecycle from a re-run: [inactive](evidence/screenshots/05a-alert-inactive-before.png) → [pending](evidence/screenshots/05b-alert-pending.png) → [firing](evidence/screenshots/05c-alert-firing.png) → [resolved](evidence/screenshots/05d-alert-resolved.png); details are in [SCREENSHOTS.md](evidence/SCREENSHOTS.md#alert-lifecycle).
+- **Trace:** a PUT sent through the ingress with a fixed `traceparent` produced a server span `POST put`, whose parent is the caller's span id, and a child span `cache.put` with the shard number. Jaeger lists service `kv-cache` with `service.version` and `vcs.revision` resource attributes. Screenshot: [`GET get` traces, 2 spans each](evidence/screenshots/04-jaeger-trace-get.png).
 - **Log → trace:** the app's JSON log line for that request carries the same `trace_id`. Loki has the line with labels `namespace`, `pod`, `container` and `app`. Grafana's Loki data source has a `TraceID` derived field that opens the trace in the Jaeger data source.
-- **Dashboard:** the chart provisions the `kv-cache` dashboard through the Grafana sidecar. Every panel query was evaluated against Prometheus and returned data.
+- **Dashboard:** the chart provisions the `kv-cache` dashboard through the Grafana sidecar. Every panel query was evaluated against Prometheus and returned data. Screenshot: [dashboard under load](evidence/screenshots/03-grafana-dashboard.png).
 
 ## Reliability tests
 
 | Test | Result | Raw output |
 |---|---|---|
-| Bad release → revert | Rollout stalled, old pod kept serving (169/169 probes 200), Argo CD Degraded after 101 s, `KvCachePodNotReady` fired **140 s** after the bad push. After the revert push: healthy in **3 s**, alert resolved in **22 s**. User-facing 5xx: **0** throughout | [`fault-demo.txt`](evidence/fault-demo.txt), [FAULT-DEMO.md](FAULT-DEMO.md) |
+| Bad release → revert | Rollout stalled, old pod kept serving (169/169 probes 200), Argo CD Degraded after 101 s, `KvCachePodNotReady` fired **140 s** after the bad push. After the revert push: healthy in **3 s**, alert resolved in **22 s**. User-facing 5xx: **0** throughout | [`fault-demo.txt`](evidence/fault-demo.txt), [FAULT-DEMO.md](FAULT-DEMO.md), screenshots [05c](evidence/screenshots/05c-alert-firing.png) and [06](evidence/screenshots/06-jaeger-readyz-errors-fault-demo.png) |
 | Delete the pod | Replacement Ready **8 s** after the delete; about **5 s of 503** at the ingress (no ready endpoint). A key written before the delete returns **404** afterwards: the cache is in-memory and starts cold by design (DECISIONS #1) | [`pod-delete.txt`](evidence/pod-delete.txt) |
 | Drain the worker node | kv-cache evicted from `kvcache-worker` and Ready on the control-plane **8 s** after the drain started; about **1.8 s of 503** (8 of 45 probes). This is the cost of one replica (DECISIONS #1, #3). The file also keeps an invalid first attempt, where Traefik was still pulling its image on the other node, with an explanation | [`node-drain.txt`](evidence/node-drain.txt) |
 | Drift (manual scale) | `kubectl scale --replicas=3` reverted to 1 by Argo CD selfHeal in **2 s**. Side effect: the scale-down kept a new pod and terminated the original, so the cache was emptied | [`drift-demo.txt`](evidence/drift-demo.txt) |
