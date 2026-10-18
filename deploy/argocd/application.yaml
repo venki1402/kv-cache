@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kv-cache
+  namespace: argocd
+spec:
+  project: default
+  source:
+    # Public repo, so Argo CD needs no Git credentials.
+    repoURL: https://github.com/venki1402/kv-cache.git
+    # Switches to main once the PR is merged.
+    targetRevision: devops
+    path: deploy/helm/kv-cache
+    helm:
+      releaseName: kv-cache
+      valueFiles:
+        - values-local.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kv-cache
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      # The namespace is created by `make secrets` with Pod Security labels
+      # before the app syncs.
+      - CreateNamespace=false
