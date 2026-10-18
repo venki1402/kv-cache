@@ -243,3 +243,40 @@ jobs:
           kubectl -n kv-cache get all,events
           kubectl -n kv-cache describe pods
           kubectl -n kv-cache logs deploy/kv-cache --tail=100 || true
+
+  release:
+    needs: e2e
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    # Required reviewers on this environment are the manual approval gate.
+    environment: production
+    permissions:
+      contents: write
+    concurrency:
+      group: release-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Bump image tag in values-local.yaml
+        run: |
+          yq -i ".image.tag = \"$SRC_SHA\"" deploy/helm/kv-cache/values-local.yaml
+          git diff --stat
+
+      - name: Commit and push release
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy/helm/kv-cache/values-local.yaml
+          if git diff --cached --quiet; then
+            echo "image tag already at $SRC_SHA"; exit 0
+          fi
+          git commit -m "chore(release): deploy ${SRC_SHA::7} [skip ci]"
+          # Another push may have landed since checkout.
+          for i in 1 2 3; do
+            git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME" && break
+            sleep 5
+          done
+          echo "released $SRC_SHA" >> "$GITHUB_STEP_SUMMARY"
